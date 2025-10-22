@@ -7,19 +7,25 @@ window.AHReactive = {
   analyser:null,dataArray:null,audioCtx:null,source:null,
   reactiveEls:[],intensity:0.6,
 
-  initAudioReactive(audioEl){
-    try{
-      this.audioCtx=new (window.AudioContext||window.webkitAudioContext)();
-      this.source=this.audioCtx.createMediaElementSource(audioEl);
-      this.analyser=this.audioCtx.createAnalyser();
-      this.analyser.fftSize=256;
-      this.dataArray=new Uint8Array(this.analyser.frequencyBinCount);
-      this.source.connect(this.analyser);
-      this.analyser.connect(this.audioCtx.destination);
-      this.loop();
-      console.log("🎧 Audio reactive engine ready");
-    }catch(e){console.warn("Audio reactive init failed:",e);}
-  },
+  initAudioReactive(audioEl) {
+  if (this.source) {
+    console.warn("🎧 Audio reactive already initialized");
+    return;
+  }
+  try {
+    this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    this.source = this.audioCtx.createMediaElementSource(audioEl);
+    this.analyser = this.audioCtx.createAnalyser();
+    this.analyser.fftSize = 256;
+    this.dataArray = new Uint8Array(this.analyser.frequencyBinCount);
+    this.source.connect(this.analyser);
+    this.analyser.connect(this.audioCtx.destination);
+    this.loop();
+    console.log("🎧 Audio reactive engine ready");
+  } catch (e) {
+    console.warn("Audio reactive init failed:", e);
+  }
+},
 
   loop(){
     if(!this.analyser)return;
