@@ -1,7 +1,11 @@
 /*--------------------------------------------------------------
   Awakening Heart : Audio Control
-  Handles ambient soundtrack unlock + mode buttons.
-  Version: 1.1 | Date: 2025-10-24
+  Handles ambient soundtrack unlock and mute functions.
+  Version: 2.0 | Date: 2025-10-24
+  Notes:
+  - Simplified for stable playback (no audio-reactive logic)
+  - Requires <audio id="bgMusic"> element in Webflow embed
+  - Works reliably with user gesture (Sound On button)
 --------------------------------------------------------------*/
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -9,34 +13,29 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnSilent = document.getElementById('btnSilent');
   const bg        = document.getElementById('bgMusic');
 
+  if (!bg) {
+    console.warn('🎧 No element with id="bgMusic" found.');
+    return;
+  }
+
   const fadeIn = () => gsap.to(bg, { volume: 0.35, duration: 1.2 });
+  const fadeOut = () => gsap.to(bg, { volume: 0, duration: 0.8 });
 
   // SOUND ON
   btnSound?.addEventListener('click', async () => {
     try {
-      // ensure we start clean
+      // reset and prepare
       bg.pause();
       bg.currentTime = 0;
       bg.muted = false;
       bg.volume = 0;
 
-      // play once (user gesture)
+      // start playback once (must be user initiated)
       await bg.play();
       fadeIn();
       console.log('🎶 Audio started');
 
-      // wait for playback to be active before attaching analyser
-      setTimeout(() => {
-        try {
-          if (bg.currentTime > 0 && !bg.paused) {
-            window.AHReactive?.initAudioReactive(bg);
-            console.log('🎧 Audio reactive engine connected');
-          }
-        } catch (err) {
-          console.warn('Audio reactive init deferred:', err);
-        }
-      }, 1000);
-
+      // optional interface calls
       window.AHOverlay?.hide();
       window.AHShader?.reveal();
     } catch (e) {
@@ -47,10 +46,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // SOUND OFF
   btnSilent?.addEventListener('click', () => {
     try {
-      bg.pause();
-      window.AHOverlay?.hide();
-      window.AHShader?.reveal();
-      console.log('🔇 Audio stopped');
+      fadeOut();
+      setTimeout(() => bg.pause(), 800);
+      console.log('🔇 Audio paused');
     } catch (e) {
       console.warn('Error stopping audio:', e);
     }
