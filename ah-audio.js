@@ -11,19 +11,25 @@ document.addEventListener('DOMContentLoaded', () => {
   const fadeIn = () => gsap.to(bg, { volume: 0.35, duration: 1.2 });
 
   btnSound?.addEventListener('click', async () => {
-    try {
-      bg.muted = true;
-      await bg.play();
-      bg.pause(); bg.currentTime = 0; bg.muted = false;
-      bg.volume = 0;
-      await bg.play();
-      fadeIn();
-      console.log('🎶 Audio started');
-      window.AHReactive?.initAudioReactive(bg);
-    } catch (e) { console.warn('Audio play failed:', e); }
-    window.AHOverlay?.hide();
-    window.AHShader?.reveal();
-  });
+  try {
+    // ensure we start clean
+    bg.pause();
+    bg.currentTime = 0;
+    bg.muted = false;
+    bg.volume = 0;
+
+    await bg.play();                  // start playback once
+    gsap.to(bg, { volume: 0.35, duration: 1.2 });  // fade in
+    console.log('🎶 Audio started');
+
+    window.AHReactive?.initAudioReactive(bg);
+  } catch (e) {
+    console.warn('Audio play failed:', e);
+  }
+
+  window.AHOverlay?.hide();
+  window.AHShader?.reveal();
+});
 
   btnSilent?.addEventListener('click', () => {
     bg.pause();
