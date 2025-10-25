@@ -1,36 +1,53 @@
 /*--------------------------------------------------------------
-  Awakening Heart : Asset Preloader + Overlay Controller
-  Loads essential media before revealing start buttons.
-  Version: 1.0 | Date: 2025-10-21
+  Awakening Heart : Preload + UI Setup
+  Updated for new audio-buttons + temple-enter-button
+  Version: 1.1 | Date: 2025-10-25
 --------------------------------------------------------------*/
-document.addEventListener('DOMContentLoaded', async () => {
-  const overlay  = document.getElementById('oracleOverlay');
-  const btnGroup = document.querySelector('.oracle-buttons');
+
+document.addEventListener('DOMContentLoaded', () => {
+
+  // --- preload all core visual/audio assets here if desired ---
+  const shaderW = document.querySelector('.shader-wrapper');
+  const overlay = document.getElementById('overlay') || document.getElementById('oracleOverlay');
+  const enter   = document.getElementById('temple-enter-button');
+  const audioBtns = document.querySelector('.audio-buttons');
+  const btnSound = document.getElementById('btnSound');
+  const btnMute  = document.getElementById('btnMute');
   const bg       = document.getElementById('bgMusic');
 
-  const preload = urls => Promise.all(urls.map(url => new Promise(res => {
-    if (!url) return res();
-    const a = new Audio(); a.src = url;
-    a.addEventListener('canplaythrough', res, { once: true });
-    a.addEventListener('error', res, { once: true });
-  })));
+  // --- initial visibility states ---
+  if (shaderW) shaderW.style.opacity = '0';
+  if (audioBtns) audioBtns.style.opacity = '0';
+  if (enter) enter.style.opacity = '0';
 
-  const assets = [
-    bg?.querySelector('source')?.src,
-    'https://cdn.prod.website-files.com/679e869aea3320bf53bd1d1c/68e42cc1d20f8098e788c799_ah_vo_test.mp3'
-  ];
+  // --- simple preload complete simulation ---
+  window.addEventListener('load', () => {
+    // fade in enter button only after load
+    if (enter) {
+      gsap.to(enter, { autoAlpha: 1, duration: 1.0, delay: 0.3, ease: "sine.inOut" });
+    }
 
-  await Promise.all([preload(assets), new Promise(r => setTimeout(r, 3000))]);
-  gsap.to(btnGroup, { autoAlpha: 1, duration: 1.2 });
-  btnGroup.style.pointerEvents = 'auto';
-  console.log('✅ Assets preloaded');
+    // keep audio buttons hidden until after entry
+    if (audioBtns) {
+      audioBtns.style.visibility = 'hidden';
+      audioBtns.style.pointerEvents = 'none';
+    }
 
-  window.AHOverlay = {
-    hide() {
-      gsap.to(overlay, {
-        autoAlpha: 0, duration: 0.8,
-        onComplete: () => overlay.style.display = 'none'
-      });
+    // optional: ensure bg audio element is silent & paused
+    if (bg) {
+      bg.pause();
+      bg.volume = 0;
+    }
+  });
+
+  // --- optional exposure for other modules ---
+  window.AHPreload = {
+    revealAudioButtons: () => {
+      if (audioBtns) {
+        audioBtns.style.visibility = 'visible';
+        audioBtns.style.pointerEvents = 'auto';
+        gsap.to(audioBtns, { autoAlpha: 1, duration: 0.6, ease: "sine.inOut" });
+      }
     }
   };
-});// JavaScript Document
+});
