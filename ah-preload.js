@@ -1,46 +1,50 @@
 /*--------------------------------------------------------------
   Awakening Heart : Preload + UI Setup
-  Updated for new audio-buttons + temple-enter-button
-  Version: 1.1 | Date: 2025-10-25
+  Waits for temple-enter-button before animating.
+  Version: 1.2 | Date: 2025-10-25
 --------------------------------------------------------------*/
 
 document.addEventListener('DOMContentLoaded', () => {
 
-  // --- preload all core visual/audio assets here if desired ---
-  const shaderW = document.querySelector('.shader-wrapper');
-  const overlay = document.getElementById('overlay') || document.getElementById('oracleOverlay');
-  const enter   = document.getElementById('temple-enter-button');
+  const shaderW   = document.querySelector('.shader-wrapper');
+  const overlay   = document.getElementById('overlay') || document.getElementById('oracleOverlay');
   const audioBtns = document.querySelector('.audio-buttons');
-  const btnSound = document.getElementById('btnSound');
-  const btnMute  = document.getElementById('btnMute');
-  const bg       = document.getElementById('bgMusic');
+  const btnSound  = document.getElementById('btnSound');
+  const btnMute   = document.getElementById('btnMute');
+  const bg        = document.getElementById('bgMusic');
 
   // --- initial visibility states ---
   if (shaderW) shaderW.style.opacity = '0';
   if (audioBtns) audioBtns.style.opacity = '0';
-  if (enter) enter.style.opacity = '0';
 
-  // --- simple preload complete simulation ---
+  // --- preload complete simulation ---
   window.addEventListener('load', () => {
-    // fade in enter button only after load
-    if (enter) {
-      gsap.to(enter, { autoAlpha: 1, duration: 1.0, delay: 0.3, ease: "sine.inOut" });
-    }
 
-    // keep audio buttons hidden until after entry
+    // 🔸 wait until the enter button actually exists
+    const waitForEnter = () => {
+      const enter = document.getElementById('temple-enter-button');
+      if (enter) {
+        gsap.to(enter, { autoAlpha: 1, duration: 1.0, delay: 0.3, ease: "sine.inOut" });
+      } else {
+        requestAnimationFrame(waitForEnter);
+      }
+    };
+    waitForEnter();
+
+    // hide audio buttons until after entry
     if (audioBtns) {
       audioBtns.style.visibility = 'hidden';
       audioBtns.style.pointerEvents = 'none';
     }
 
-    // optional: ensure bg audio element is silent & paused
+    // ensure background audio silent & paused
     if (bg) {
       bg.pause();
       bg.volume = 0;
     }
   });
 
-  // --- optional exposure for other modules ---
+  // --- helper exposed globally ---
   window.AHPreload = {
     revealAudioButtons: () => {
       if (audioBtns) {
