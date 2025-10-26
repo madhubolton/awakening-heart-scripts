@@ -1,11 +1,10 @@
 /*--------------------------------------------------------------
   Awakening Heart : Enter Sequence
   Adds pointer cursor + full-screen click area activation.
-  Version: 1.2 | Date: 2025-10-27
+  Version: 1.3 | Date: 2025-10-27
 --------------------------------------------------------------*/
 
 document.addEventListener('DOMContentLoaded', () => {
-  // --- element references ---
   const overlay   = document.getElementById('overlay') || document.getElementById('oracleOverlay');
   const temple    = document.getElementById('temple-container');
   const enterBtn  = document.getElementById('temple-enter-button');
@@ -13,11 +12,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const bg        = document.getElementById('bgMusic');
   const btnSound  = document.getElementById('btnSound');
   const btnMute   = document.getElementById('btnMute');
-  const clickArea = document.getElementById('enter-click-area'); // full-screen div
+  const clickArea = document.getElementById('enter-click-area');
 
   // --- helpers -------------------------------------------------
-  const fadeOverlayOut = () =>
-    !overlay ? Promise.resolve() :
+  const fadeOverlayOut = () => !overlay ? Promise.resolve() :
     new Promise(res => {
       gsap.to(overlay, {
         autoAlpha: 0, duration: 0.8, ease: "sine.inOut",
@@ -25,8 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     });
 
-  const dissolveTemple = () =>
-    !temple ? Promise.resolve() :
+  const dissolveTemple = () => !temple ? Promise.resolve() :
     new Promise(res => {
       gsap.to(temple, {
         autoAlpha: 0, duration: 1.0, ease: "sine.inOut",
@@ -57,10 +54,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const revealAudioButtons = () =>
     window.AHPreload?.revealAudioButtons?.();
 
-  // --- main entry activation -----------------------------------
+  // --- entry activation ----------------------------------------
   const activateEntry = async () => {
     if (enterBtn) enterBtn.style.pointerEvents = 'none';
-    if (clickArea) clickArea.style.display = 'none';
+    if (clickArea) gsap.to(clickArea, { autoAlpha: 0, duration: 0.3, onComplete: () => clickArea.style.display = 'none' });
     await fadeOverlayOut();
     revealShader();
     await dissolveTemple();
@@ -92,10 +89,12 @@ document.addEventListener('DOMContentLoaded', () => {
     shaderW.style.pointerEvents = 'none';
   }
 
-  // ensure pointer cursor on button + click area
+  // ensure pointer cursor + fade-in for click layer
   if (enterBtn) enterBtn.style.cursor = 'pointer';
   if (clickArea) {
     clickArea.style.cursor = 'pointer';
-    clickArea.style.display = 'block'; // becomes active once enter visible
+    clickArea.style.display = 'block';
+    gsap.set(clickArea, { autoAlpha: 0 });
+    gsap.to(clickArea, { autoAlpha: 1, duration: 1.0, delay: 0.3 });
   }
 });
