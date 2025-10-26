@@ -1,41 +1,45 @@
 /*--------------------------------------------------------------
   Awakening Heart : Cinematic Opening Sequence
-  Version 2.0 | 2025-10-27
-  Structure: scene intro → title burn → 3 prompts → enter activation
+  Version 2.1 | 2025-10-27
+  Corrected selectors for #prompt1–3 and .Metatron
 --------------------------------------------------------------*/
 
 document.addEventListener("DOMContentLoaded", () => {
-  const overlay   = document.getElementById("overlay") || document.getElementById("oracleOverlay");
+  console.log("🎞 ah-enter.js version 2.1 loaded");
+
+  const overlay   = document.getElementById("oracleOverlay");
   const temple    = document.getElementById("temple-container");
   const title     = document.getElementById("ah-title");
-  const metatron  = document.querySelector(".metatron");
+  const metatron  = document.querySelector(".Metatron");
   const shaderW   = document.querySelector(".shader-wrapper");
   const bg        = document.getElementById("bgMusic");
   const enterBtn  = document.getElementById("temple-enter-button");
   const audioUI   = document.querySelector(".audio-buttons");
   const btnSound  = document.getElementById("btnSound");
   const btnMute   = document.getElementById("btnMute");
-  const prompts   = [
-    document.querySelector(".prompt1"),
-    document.querySelector(".prompt2"),
-    document.querySelector(".prompt3"),
+
+  // prompt elements use IDs, not classes
+  const prompts = [
+    document.getElementById("prompt1"),
+    document.getElementById("prompt2"),
+    document.getElementById("prompt3")
   ];
 
-  console.log("🎥 Cinematic sequence init", {overlay, temple, title, prompts, metatron});
+  console.log("🎬 Elements found:", { overlay, temple, title, prompts, metatron });
 
-  // Initial state -------------------------------------------------
+  // Initial state
   gsap.set([title, prompts, enterBtn], { autoAlpha: 0 });
   if (shaderW) gsap.set(shaderW, { autoAlpha: 0 });
   if (audioUI) gsap.set(audioUI, { autoAlpha: 0, pointerEvents: "none" });
   if (bg) { bg.pause(); bg.volume = 0; }
 
-  // Master timeline -----------------------------------------------
+  // Master timeline
   const tl = gsap.timeline({ defaults: { ease: "sine.inOut" } });
 
-  // 1. Scene opens
-  tl.to({}, { duration: 1 }); // pause 1s for stillness
+  // Scene hold
+  tl.to({}, { duration: 1 });
 
-  // 2. Title flash-burn
+  // Title flash-burn
   tl.to(title, { autoAlpha: 1, duration: 0.2 })
     .to(title, {
       scale: 1.3,
@@ -51,32 +55,18 @@ document.addEventListener("DOMContentLoaded", () => {
       duration: 0.3,
       ease: "power2.inOut"
     })
-    .to({}, { duration: 0.5 }); // pause 0.5s
+    .to({}, { duration: 0.5 });
 
-  // 3–5. Prompts
+  // Prompts 1-3
   prompts.forEach((p, i) => {
     if (!p) return;
-    tl.to(p, {
-      autoAlpha: 1,
-      scale: 0.5,
-      duration: 0.01,
-      onStart: () => gsap.set(p, { scale: 0.5 })
-    })
-      .to(p, {
-        scale: 1,
-        duration: 0.8,
-        ease: "power2.out"
-      })
-      .to({}, { duration: 2 }) // pause visible
-      .to(p, {
-        scale: 0.3,
-        autoAlpha: 0,
-        duration: 0.8,
-        ease: "power2.in"
-      });
+    tl.to(p, { autoAlpha: 1, scale: 0.5, duration: 0.01 })
+      .to(p, { scale: 1, duration: 0.8, ease: "power2.out" })
+      .to({}, { duration: 2 })
+      .to(p, { scale: 0.3, autoAlpha: 0, duration: 0.8, ease: "power2.in" });
   });
 
-  // 6. Enter button appears
+  // Enter button appears
   tl.to(enterBtn, {
     autoAlpha: 1,
     duration: 1,
@@ -87,8 +77,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // ---------------------------------------------------------------
-  // Click interaction (enter sequence)
+  // On-click: enter sequence
   async function activateEntry() {
     if (window.__AH_STARTED) return;
     window.__AH_STARTED = true;
@@ -96,19 +85,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (enterBtn) enterBtn.style.pointerEvents = "none";
 
-    // Make cinematic forward motion
     const enterTL = gsap.timeline({ defaults: { ease: "sine.inOut" } });
 
-    // Move into temple
     enterTL.to(metatron, { scale: 0.3, duration: 2, ease: "power3.inOut" }, 0);
     enterTL.to(title, { autoAlpha: 0, duration: 0.8 }, 0);
     enterTL.to(enterBtn, { autoAlpha: 0, duration: 0.6 }, 0.2);
     enterTL.to(temple, { autoAlpha: 0, duration: 1.2 }, 0.3);
-
-    // Reveal shader
     enterTL.to(shaderW, { autoAlpha: 1, duration: 1.5 }, "-=0.8");
 
-    // Start background sound
     enterTL.add(async () => {
       if (bg) {
         try {
@@ -121,13 +105,11 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }, "-=1.2");
 
-    // Fade in sound controls
     enterTL.to(audioUI, { autoAlpha: 1, duration: 0.8, pointerEvents: "auto" }, "-=0.5");
   }
 
   enterBtn?.addEventListener("click", activateEntry);
 
-  // Sound controls
   btnSound?.addEventListener("click", async () => {
     if (!bg) return;
     if (bg.paused) await bg.play();
@@ -138,7 +120,6 @@ document.addEventListener("DOMContentLoaded", () => {
     gsap.to(bg, { volume: 0, duration: 0.3, onComplete: () => bg.pause() });
   });
 
-  // Start the timeline after full load
   window.addEventListener("load", () => {
     console.log("🎬 Starting cinematic timeline");
     tl.play(0);
