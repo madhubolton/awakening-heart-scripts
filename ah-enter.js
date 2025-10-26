@@ -1,131 +1,82 @@
 /*--------------------------------------------------------------
-  Awakening Heart : Enter (BASIC)
-  - Fades in the Enter SVG from code
-  - Allows "click anywhere" via a one-time global listener
-  - Runs overlay → shader → temple → audio → show audio buttons
-  Version: 1.5 | 2025-10-27
+  Awakening Heart : Enter (diagnostic base)
+  Fades in the Enter SVG, allows click anywhere, 
+  fades temple, overlay, starts shader + audio.
 --------------------------------------------------------------*/
 
-document.addEventListener('DOMContentLoaded', () => {
-  // Core refs (IDs match your current page)
-  const overlay   = document.getElementById('overlay') || document.getElementById('oracleOverlay');
-  const temple    = document.getElementById('temple-container');
-  const shaderW   = document.querySelector('.shader-wrapper');
-  const bg        = document.getElementById('bgMusic');
+document.addEventListener("DOMContentLoaded", () => {
+  const overlay   = document.getElementById("overlay") || document.getElementById("oracleOverlay");
+  const temple    = document.getElementById("temple-container");
+  const enterBtn  = document.getElementById("temple-enter-button");
+  const shaderW   = document.querySelector(".shader-wrapper");
+  const bg        = document.getElementById("bgMusic");
+  const audioUI   = document.querySelector(".audio-buttons");
+  const btnSound  = document.getElementById("btnSound");
+  const btnMute   = document.getElementById("btnMute");
 
-  // UI refs
-  const enterBtn  = document.getElementById('temple-enter-button');
-  const audioUI   = document.querySelector('.audio-buttons');
-  const btnSound  = document.getElementById('btnSound');
-  const btnMute   = document.getElementById('btnMute');
+  console.log("✨ DOM ready", { overlay, temple, enterBtn, shaderW, bg });
 
-  // Safety log
-  console.log('AH Enter basic init:', { overlay, temple, shaderW, bg, enterBtn, audioUI });
+  // --- make sure everything starts hidden / paused -------------
+  if (shaderW) gsap.set(shaderW, { autoAlpha: 0 });
+  if (audioUI) gsap.set(audioUI, { autoAlpha: 0, pointerEvents: "none" });
+  if (bg) { bg.pause(); bg.volume = 0; bg.muted = false; }
 
-  // --- initial state (do NOT rely on Designer) ----------------
-  if (enterBtn) {
-    gsap.set(enterBtn, { autoAlpha: 0 });  // hidden until we fade it in
-    enterBtn.style.cursor = 'pointer';
-    enterBtn.style.zIndex = '9999';        // keep on top
-    enterBtn.style.pointerEvents = 'auto';
-  }
-  if (audioUI) {
-    audioUI.style.visibility = 'hidden';
-    audioUI.style.pointerEvents = 'none';
-    gsap.set(audioUI, { autoAlpha: 0 });
-  }
-  if (shaderW) {
-    shaderW.style.opacity = '0';
-    shaderW.style.visibility = 'hidden';
-    shaderW.style.display = 'block';
-    shaderW.style.pointerEvents = 'none';
-  }
-  if (bg) {
-    bg.pause();
-    bg.volume = 0;
-    bg.muted = false;
-  }
+  // --- fade the enter button in once the page is fully loaded ---
+  window.addEventListener("load", () => {
+    if (enterBtn) {
+      gsap.fromTo(enterBtn, { autoAlpha: 0 }, { autoAlpha: 1, duration: 1, ease: "sine.inOut" });
+      console.log("✅ Enter fade started");
+    }
+  });
 
-  // --- helpers -------------------------------------------------
-  const fadeOverlayOut = () => !overlay ? Promise.resolve() :
-    new Promise(res => gsap.to(overlay, {
-      autoAlpha: 0, duration: 0.8, ease: 'sine.inOut',
-      onComplete: () => { overlay.style.display = 'none'; res(); }
-    }));
+  // --- main sequence --------------------------------------------
+  async function activateEntry() {
+    if (window.__AH_STARTED) return;
+    window.__AH_STARTED = true;
+    console.log("🚪 Sequence triggered");
 
-  const dissolveTemple = () => !temple ? Promise.resolve() :
-    new Promise(res => gsap.to(temple, {
-      autoAlpha: 0, duration: 1.0, ease: 'sine.inOut',
-      onComplete: () => { temple.style.display = 'none'; res(); }
-    }));
+    if (enterBtn) enterBtn.style.pointerEvents = "none";
 
-  const revealShader = () => {
+    // fade overlay
+    if (overlay) await gsap.to(overlay, { autoAlpha: 0, duration: 0.8, ease: "sine.inOut" });
+
+    // reveal shader
     if (window.AHShader?.reveal) window.AHShader.reveal();
-    else if (shaderW) gsap.to(shaderW, { autoAlpha: 1, duration: 1.0 });
-  };
+    else if (shaderW) gsap.to(shaderW, { autoAlpha: 1, duration: 1 });
 
-  const fadeInAudio = async (target = 0.35, dur = 1.2) => {
-    if (!bg) return;
-    try {
-      await bg.play(); // after a real user click this will succeed
-      gsap.to(bg, { volume: target, duration: dur, ease: 'sine.inOut' });
-      if (window.AHReactive?.initAudioReactive) AHReactive.initAudioReactive(bg);
-      console.log('🎶 audio started');
-    } catch (e) {
-      console.warn('Audio play failed:', e);
+    // fade temple
+    if (temple) await gsap.to(temple, { autoAlpha: 0, duration: 1.2, ease: "sine.inOut" });
+
+    // start audio
+    if (bg) {
+      try {
+        await bg.play();
+        gsap.to(bg, { volume: 0.35, duration: 1.2, ease: "sine.inOut" });
+        console.log("🎶 audio started");
+      } catch (e) {
+        console.warn("audio play blocked:", e);
+      }
     }
-  };
 
-  const revealAudioButtons = () => {
-    if (!audioUI) return;
-    audioUI.style.visibility = 'visible';
-    audioUI.style.pointerEvents = 'auto';
-    gsap.to(audioUI, { autoAlpha: 1, duration: 0.6 });
-  };
-
-  // --- one unified entry action --------------------------------
-  const activateEntry = async () => {
-    if (!window.__AH_ENTERED) {
-      window.__AH_ENTERED = true; // guard against double triggers
-      document.removeEventListener('click', globalClickOnce, true);
-      if (enterBtn) enterBtn.style.pointerEvents = 'none';
-
-      await fadeOverlayOut();
-      revealShader();
-      await dissolveTemple();
-      await fadeInAudio(0.35, 1.2);
-      revealAudioButtons();
-      console.log('🚪 Enter sequence complete');
-    }
-  };
-
-  // --- fade in the button and arm "click anywhere" -------------
-  let ready = false;
-  window.addEventListener('load', () => {
-    if (enterBtn) gsap.to(enterBtn, { autoAlpha: 1, duration: 0.9, delay: 0.2 });
-    // arm global click only after the Enter is visible
-    setTimeout(() => { ready = true; }, 400);
-  });
-
-  // one-time global click (anywhere)
-  function globalClickOnce(e) {
-    if (!ready) return; // ignore early clicks during load
-    // ignore clicks on audio controls so they don't start the scene
-    if (e.target && audioUI && audioUI.contains(e.target)) return;
-    activateEntry();
+    // show sound buttons
+    if (audioUI) gsap.to(audioUI, { autoAlpha: 1, duration: 0.6, pointerEvents: "auto" });
   }
-  document.addEventListener('click', globalClickOnce, true);
 
-  // specific Enter button click
-  enterBtn?.addEventListener('click', (e) => { e.stopPropagation(); activateEntry(); });
+  // --- listeners ------------------------------------------------
+  // click on the button
+  enterBtn?.addEventListener("click", (e) => { e.stopPropagation(); activateEntry(); });
 
-  // --- persistent audio toggles --------------------------------
-  btnSound?.addEventListener('click', async () => {
-    if (!bg) return;
-    if (bg.paused) await fadeInAudio(0.35, 0.6);
-    else gsap.to(bg, { volume: 0.35, duration: 0.3 });
+  // click anywhere else on page
+  document.addEventListener("click", (e) => {
+    if (!window.__AH_STARTED && !audioUI?.contains(e.target)) activateEntry();
   });
-  btnMute?.addEventListener('click', () => {
+
+  // sound controls
+  btnSound?.addEventListener("click", async () => {
+    if (bg?.paused) await bg.play();
+    gsap.to(bg, { volume: 0.35, duration: 0.3 });
+  });
+  btnMute?.addEventListener("click", () => {
     if (!bg) return;
     gsap.to(bg, { volume: 0, duration: 0.3, onComplete: () => bg.pause() });
   });
