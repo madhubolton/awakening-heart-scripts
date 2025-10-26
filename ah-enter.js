@@ -27,6 +27,25 @@ document.addEventListener("DOMContentLoaded", () => {
 
   console.log("🎬 Elements found:", { overlay, temple, title, prompts, metatron });
 
+  // ✅ Diagnostic: check for any missing elements
+  setTimeout(() => {
+    const missing = [];
+    if (!document.getElementById("ah-title")) missing.push("#ah-title");
+    if (!document.querySelector(".Metatron")) missing.push(".Metatron");
+    if (!document.getElementById("prompt1")) missing.push("#prompt1");
+    if (!document.getElementById("prompt2")) missing.push("#prompt2");
+    if (!document.getElementById("prompt3")) missing.push("#prompt3");
+
+    if (missing.length) {
+      console.warn("⚠️ Missing elements:", missing.join(", "));
+    } else {
+      console.log("✅ All key elements found, running timeline...");
+    }
+  }, 500);
+
+  // (rest of your animation code below)
+});
+
   // Initial state
   gsap.set([title, prompts, enterBtn], { autoAlpha: 0 });
   if (shaderW) gsap.set(shaderW, { autoAlpha: 0 });
