@@ -1,131 +1,107 @@
 /*--------------------------------------------------------------
-  Awakening Heart : Oracle Opening Sequence
-  Version 5.1 – Clean optimized cinematic version
-  Author: Madhu Bolton
+  Awakening Heart : Oracle Entry Sequence (v5.2)
+  --------------------------------------------------------------
+  STRUCTURE:
+  - #oracleOverlay        → Temple silhouette / overlay
+  - #temple-container     → 3D temple base
+  - #ah-title             → "Awakening Heart" title
+  - #prompt1, #prompt2, #prompt3 → reflection prompts
+  - #temple-enter-wrapper → Enter button wrapper DIV (not SVG)
+  - .shader-wrapper       → Hidden shader background
+  - #bgMusic              → Ambient background sound
+  - .audio-buttons        → Sound control buttons
 --------------------------------------------------------------*/
 
 document.addEventListener("DOMContentLoaded", () => {
-  console.log("💠 Awakening Heart : Oracle Opening initialized (v5.0)");
+  console.log("🪶 Awakening Heart : Oracle Opening initialized");
 
-  // 🔹 Core DOM elements
-  const overlay    = document.getElementById("oracleOverlay");
-  const temple     = document.getElementById("temple-container");
-  const titleWrap  = document.querySelector(".title-wrapper");
-  const title      = document.getElementById("ah-title");
-  const prompts    = [
+  // --- Element references ---
+  const overlay   = document.getElementById("oracleOverlay");
+  const temple    = document.getElementById("temple-container");
+  const title     = document.getElementById("ah-title");
+  const prompts   = [
     document.getElementById("prompt1"),
     document.getElementById("prompt2"),
     document.getElementById("prompt3")
   ];
-  const enterBtn   = document.getElementById("temple-enter-button");
-  const shaderW    = document.querySelector(".shader-wrapper");
-  const bg         = document.getElementById("bgMusic");
-  const audioUI    = document.querySelector(".audio-buttons");
-  const btnSound   = document.getElementById("btnSound");
-  const btnMute    = document.getElementById("btnMute");
+  const enterBtn  = document.getElementById("temple-enter-wrapper");
+  const shaderW   = document.querySelector(".shader-wrapper");
+  const bg        = document.getElementById("bgMusic");
+  const audioUI   = document.querySelector(".audio-buttons");
+  const btnSound  = document.getElementById("btnSound");
+  const btnMute   = document.getElementById("btnMute");
 
-  // 🔹 Flags
-  let oracleReady = false;
-  let oracleEntered = false;
+  console.log("✨ Elements found:", { overlay, temple, title, prompts, enterBtn });
 
-  // 🟣 Reset and hide everything to prevent flicker
-  gsap.set([title, ...prompts, enterBtn, audioUI, shaderW], {
+  // --- Safety reset to avoid flicker ---
+  gsap.set([title, ...prompts, shaderW, audioUI, enterBtn], {
     autoAlpha: 0,
-    pointerEvents: "none",
+    pointerEvents: "none"
   });
   if (bg) { bg.pause(); bg.volume = 0; bg.muted = false; }
 
-  // 🧹 Clear any Webflow transforms
-  [title, titleWrap].forEach(el => {
-    if (el) {
-      el.style.transform = "none";
-      gsap.set(el, { clearProps: "transform", scale: 1 });
+  // --- GSAP timeline for Oracle opening ---
+  const tl = gsap.timeline({
+    defaults: { ease: "sine.inOut" },
+    onComplete: () => {
+      console.log("✨ Oracle opening complete — Enter ready");
+      gsap.to(enterBtn, { autoAlpha: 1, duration: 1, pointerEvents: "auto" });
+      document.body.style.cursor = "pointer";
     }
   });
 
-  // 🎬 Main cinematic timeline
-const tl = gsap.timeline({
-  defaults: { ease: "sine.inOut" },
-  onStart: () => console.log("🎞️ Oracle opening sequence started"),
-});
+  tl.addLabel("start")
+    // Title fade-in (no zoom)
+    .to(title, { autoAlpha: 1, color: "#9666cc", duration: 1.2 }, "start+=0.5")
+    // Title glow and fade to final color
+    .to(title, { color: "#8359b2", duration: 1.5, ease: "sine.inOut" }, ">")
+    .addLabel("prompts")
+    // Prompts sequence
+    .fromTo(prompts[0], { scale: 0.8, autoAlpha: 0 }, { scale: 1, autoAlpha: 1, duration: 0.8 }, "prompts+=0.2")
+    .to(prompts[0], { autoAlpha: 0, scale: 0.8, duration: 0.6 }, "+=2.0")
+    .fromTo(prompts[1], { scale: 0.8, autoAlpha: 0 }, { scale: 1, autoAlpha: 1, duration: 0.8 }, ">")
+    .to(prompts[1], { autoAlpha: 0, scale: 0.8, duration: 0.6 }, "+=2.0")
+    .fromTo(prompts[2], { scale: 0.8, autoAlpha: 0 }, { scale: 1, autoAlpha: 1, duration: 0.8 }, ">")
+    .to(prompts[2], { autoAlpha: 0, scale: 0.8, duration: 0.6 }, "+=2.0")
+    .addLabel("endPrompts");
 
-// Step 1 — Title fade-in and gentle glow
-tl.to(title, { autoAlpha: 1, duration: 1.5 })
-  .to(title, { color: "hsl(268, 30%, 85%)", duration: 0.8 })
-  .to(title, { color: "hsl(268, 50%, 60%)", duration: 1.5 }, ">0.1");
-
-// Step 2 — Reflection prompts (sequential)
-prompts.forEach((p, i) => {
-  if (!p) return;
-  const delay = i === 0 ? 0.5 : 0;
-  tl.to(p, { autoAlpha: 1, duration: 1, delay }, ">")
-    .to(p, { autoAlpha: 0, duration: 1.2 }, ">2");
-});
-
-// Step 3 — Short pause
-tl.to({}, { duration: 0.6 });
-
-// Step 4 — Enter button reveal (AFTER everything)
-tl.to(enterBtn, { 
-  autoAlpha: 1, 
-  duration: 1, 
-  ease: "sine.inOut", 
-  onStart: () => {
-    gsap.set(enterBtn, { pointerEvents: "auto", cursor: "pointer" });
-    console.log("✨ Oracle intro complete — Enter ready");
-    oracleReady = true;
-  }
-});
-
-  // 🚪 Entry activation (triggered by click)
+  // --- Entry activation ---
   async function activateEntry() {
-    if (oracleEntered || !oracleReady) return;
-    oracleEntered = true;
+    if (window.__AH_STARTED) return;
+    window.__AH_STARTED = true;
     console.log("🚪 Oracle entered");
 
-    // Hide Enter button immediately
-    gsap.to(enterBtn, { autoAlpha: 0, duration: 0.6, ease: "sine.inOut" });
-    gsap.set(enterBtn, { pointerEvents: "none" });
+    gsap.to(enterBtn, { autoAlpha: 0, duration: 0.6, pointerEvents: "none" });
+    document.body.style.cursor = "default";
 
-    // Fade temple and overlay
-    await gsap.to([overlay, temple], { autoAlpha: 0, duration: 1.2, ease: "sine.inOut" });
+    if (overlay) await gsap.to(overlay, { autoAlpha: 0, duration: 1.2 });
+    if (temple)  await gsap.to(temple, { autoAlpha: 0, duration: 1.2 });
 
-    // Reveal shader
+    if (shaderW) gsap.to(shaderW, { autoAlpha: 1, duration: 1.5 });
     if (window.AHShader?.reveal) window.AHShader.reveal();
-    else if (shaderW) gsap.to(shaderW, { autoAlpha: 1, duration: 1.2 });
 
-    // Start audio
+    // Audio start
     if (bg) {
       try {
         await bg.play();
-        gsap.to(bg, { volume: 0.35, duration: 1.2, ease: "sine.inOut" });
-        console.log("🎵 Audio started");
-      } catch (err) {
-        console.warn("⚠️ Audio blocked:", err);
+        gsap.to(bg, { volume: 0.35, duration: 1.2 });
+        console.log("🎶 Audio started");
+      } catch (e) {
+        console.warn("Audio play blocked:", e);
       }
     }
 
-    // Show sound controls
-    if (audioUI) {
-      gsap.to(audioUI, { autoAlpha: 1, duration: 0.6 });
-      gsap.set(audioUI, { pointerEvents: "auto" });
-    }
+    // Reveal audio UI
+    if (audioUI) gsap.to(audioUI, { autoAlpha: 1, duration: 0.8, pointerEvents: "auto" });
   }
 
-  // 🖱️ Click anywhere (after ready)
+  // --- Interaction handlers ---
+  enterBtn?.addEventListener("click", (e) => { e.stopPropagation(); activateEntry(); });
   document.addEventListener("click", (e) => {
-    if (oracleReady && !oracleEntered && !audioUI?.contains(e.target)) {
-      activateEntry();
-    }
+    if (!window.__AH_STARTED && !audioUI?.contains(e.target)) activateEntry();
   });
 
-  // 🖱️ Click Enter button
-  enterBtn?.addEventListener("click", (e) => {
-    e.stopPropagation();
-    activateEntry();
-  });
-
-  // 🎧 Sound controls
+  // Sound controls
   btnSound?.addEventListener("click", async () => {
     if (bg?.paused) await bg.play();
     gsap.to(bg, { volume: 0.35, duration: 0.3 });
