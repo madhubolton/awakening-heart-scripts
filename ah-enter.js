@@ -44,32 +44,38 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // 🎬 Main cinematic timeline
-  const tl = gsap.timeline({
-    defaults: { ease: "sine.inOut" },
-    onStart: () => console.log("🎞️ Oracle opening sequence started"),
-    onComplete: () => {
-      oracleReady = true;
-      console.log("✨ Oracle intro complete — ready for entry");
-      gsap.to(enterBtn, { autoAlpha: 1, duration: 1, ease: "sine.inOut" });
-      gsap.set(enterBtn, { pointerEvents: "auto", cursor: "pointer" });
-    },
-  });
+const tl = gsap.timeline({
+  defaults: { ease: "sine.inOut" },
+  onStart: () => console.log("🎞️ Oracle opening sequence started"),
+});
 
-  // Step 1 — Title fade-in and gentle glow
-  tl.to(title, { autoAlpha: 1, duration: 1.5 })
-    .to(title, { color: "hsl(268, 30%, 85%)", duration: 0.8 })
-    .to(title, { color: "hsl(268, 50%, 60%)", duration: 1.5 }, ">0.1");
+// Step 1 — Title fade-in and gentle glow
+tl.to(title, { autoAlpha: 1, duration: 1.5 })
+  .to(title, { color: "hsl(268, 30%, 85%)", duration: 0.8 })
+  .to(title, { color: "hsl(268, 50%, 60%)", duration: 1.5 }, ">0.1");
 
-  // Step 2 — Reflection prompts (sequential)
-  prompts.forEach((p, i) => {
-    if (!p) return;
-    const delay = i === 0 ? 0.5 : 0;
-    tl.to(p, { autoAlpha: 1, duration: 1, delay }, ">")
-      .to(p, { autoAlpha: 0, duration: 1.2 }, ">2");
-  });
+// Step 2 — Reflection prompts (sequential)
+prompts.forEach((p, i) => {
+  if (!p) return;
+  const delay = i === 0 ? 0.5 : 0;
+  tl.to(p, { autoAlpha: 1, duration: 1, delay }, ">")
+    .to(p, { autoAlpha: 0, duration: 1.2 }, ">2");
+});
 
-  // Step 3 — Subtle pause before Enter appears
-  tl.to({}, { duration: 0.6 });
+// Step 3 — Short pause
+tl.to({}, { duration: 0.6 });
+
+// Step 4 — Enter button reveal (AFTER everything)
+tl.to(enterBtn, { 
+  autoAlpha: 1, 
+  duration: 1, 
+  ease: "sine.inOut", 
+  onStart: () => {
+    gsap.set(enterBtn, { pointerEvents: "auto", cursor: "pointer" });
+    console.log("✨ Oracle intro complete — Enter ready");
+    oracleReady = true;
+  }
+});
 
   // 🚪 Entry activation (triggered by click)
   async function activateEntry() {
