@@ -1,8 +1,6 @@
 /*--------------------------------------------------------------
-  Awakening Heart : Oracle Opening Sequence
-  Single-file unified version
-  Purpose : One-time opening for the Oracle experience.
-  Version 4.0 | 2025-10-27
+  Awakening Heart : Oracle Opening Sequence (Refined)
+  Version 4.1 | 2025-10-27
 --------------------------------------------------------------*/
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -34,7 +32,7 @@ document.addEventListener("DOMContentLoaded", () => {
   if (bg) { bg.pause(); bg.volume = 0; bg.muted = false; }
 
   // ==============================================================
-  //  OPENING TIMELINE  –  plays automatically once per session
+  //  OPENING TIMELINE
   // ==============================================================
 
   const tl = gsap.timeline({ defaults: { ease: "sine.inOut" } });
@@ -42,36 +40,33 @@ document.addEventListener("DOMContentLoaded", () => {
   // 1️⃣ Scene opens – stillness
   tl.to({}, { duration: 1.0 });
 
-  // 2️⃣ Title "Awakening Heart" burn-in
-  tl.to(title, { autoAlpha: 1, duration: 0.2 })
+  // 2️⃣ Title "Awakening Heart" simple fade and glow
+  tl.to(title, { autoAlpha: 1, duration: 1.0, ease: "power2.out" })
     .to(title, {
-      scale: 1.3,
-      color: "hsl(268, 60%, 90%)",
-      textShadow: "0 0 24px rgba(180,150,255,0.85)",
-      duration: 0.3,
+      color: "hsl(268, 60%, 85%)",
+      textShadow: "0 0 20px rgba(180,150,255,0.8)",
+      duration: 0.8,
       ease: "power2.out"
     })
     .to(title, {
-      scale: 1,
       color: "hsl(268, 50%, 60%)",
       textShadow: "none",
-      duration: 0.4,
+      duration: 1.0,
       ease: "power2.inOut"
     })
-    .to({}, { duration: 0.5 }); // quiet pause
+    .to({}, { duration: 0.5 }); // brief pause before prompts
 
-  // 3️⃣ Reflection Prompts (one by one)
-  const promptBeat = (el) => {
+  // 3️⃣ Reflection Prompts (smooth crossfade transitions)
+  const promptBeat = (el, index) => {
     if (!el) return;
-    tl.to(el, { autoAlpha: 1, duration: 0.01, onStart: () => gsap.set(el, { scale: 0.5 }) })
-      .to(el, { scale: 1, duration: 0.8, ease: "power2.out" })
-      .to({}, { duration: 2.0 }) // visible
-      .to(el, { scale: 0.3, autoAlpha: 0, duration: 0.8, ease: "power2.in" })
-      .to({}, { duration: 0.2 }); // small gap
+    const overlap = 0.2; // overlap for smoother crossfade
+    tl.to(el, { autoAlpha: 1, scale: 1, duration: 0.8, ease: "power2.out" })
+      .to({}, { duration: 2.0 }) // visible time
+      .to(el, { autoAlpha: 0, scale: 0.9, duration: 0.8, ease: "power2.in" }, `-=${overlap}`);
   };
   prompts.forEach(promptBeat);
 
-  // 4️⃣ Enter button appears
+  // 4️⃣ Enter button fade-in AFTER prompts
   tl.to(enterBtn, {
     autoAlpha: 1,
     duration: 1.0,
@@ -85,7 +80,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // ---- Run timeline after fonts and layout ready ----
+  // ---- Run timeline after fonts/layout ready ----
   window.addEventListener("load", () => {
     console.log("▶️ Starting Oracle opening timeline");
     tl.play(0);
@@ -100,19 +95,19 @@ document.addEventListener("DOMContentLoaded", () => {
     window.__AH_STARTED = true;
     console.log("🚪 Oracle entered");
 
-    if (enterBtn) enterBtn.style.pointerEvents = "none";
-
     const enterTL = gsap.timeline({ defaults: { ease: "sine.inOut" } });
+
+    // hide enter immediately
+    if (enterBtn) enterTL.set(enterBtn, { autoAlpha: 0, pointerEvents: "none" });
 
     // dissolve overlay + temple
     if (overlay) enterTL.to(overlay, { autoAlpha: 0, duration: 0.8 }, 0);
     if (temple)  enterTL.to(temple,  { autoAlpha: 0, duration: 1.0 }, 0.2);
 
-    // fade title + enter
+    // fade title
     enterTL.to(title, { autoAlpha: 0, duration: 0.8 }, 0);
-    enterTL.to(enterBtn, { autoAlpha: 0, duration: 0.6 }, 0.1);
 
-    // subtle Metatron forward motion
+    // Metatron forward motion
     if (metatron) enterTL.to(metatron, { scale: 0.3, duration: 2.0, ease: "power3.inOut" }, 0.1);
 
     // reveal shader
