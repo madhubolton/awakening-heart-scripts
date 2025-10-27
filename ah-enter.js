@@ -1,12 +1,13 @@
 /*--------------------------------------------------------------
-  Awakening Heart : Oracle Opening Sequence (Refined)
-  Version 4.1 | 2025-10-27
+  Awakening Heart : Oracle Opening Sequence (v4.2)
+  Fixes: Enter timing, title zoom, click-anywhere delay.
+  2025-10-27
 --------------------------------------------------------------*/
 
 document.addEventListener("DOMContentLoaded", () => {
   console.log("💠 Awakening Heart : Oracle Opening initialized");
 
-  // ---- Element References ----
+  // ---- Elements ----
   const overlay   = document.getElementById("oracleOverlay") || document.getElementById("overlay");
   const temple    = document.getElementById("temple-container");
   const title     = document.getElementById("ah-title");
@@ -27,6 +28,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // ---- Initial States ----
   gsap.set([title, ...prompts, enterBtn], { autoAlpha: 0 });
+  if (enterBtn) enterBtn.style.pointerEvents = "none";
   if (shaderW) gsap.set(shaderW, { autoAlpha: 0 });
   if (audioUI) gsap.set(audioUI, { autoAlpha: 0, pointerEvents: "none" });
   if (bg) { bg.pause(); bg.volume = 0; bg.muted = false; }
@@ -40,12 +42,12 @@ document.addEventListener("DOMContentLoaded", () => {
   // 1️⃣ Scene opens – stillness
   tl.to({}, { duration: 1.0 });
 
-  // 2️⃣ Title "Awakening Heart" simple fade and glow
+  // 2️⃣ Title simple fade and glow (no zoom)
   tl.to(title, { autoAlpha: 1, duration: 1.0, ease: "power2.out" })
     .to(title, {
       color: "hsl(268, 60%, 85%)",
       textShadow: "0 0 20px rgba(180,150,255,0.8)",
-      duration: 0.8,
+      duration: 1.0,
       ease: "power2.out"
     })
     .to(title, {
@@ -54,19 +56,19 @@ document.addEventListener("DOMContentLoaded", () => {
       duration: 1.0,
       ease: "power2.inOut"
     })
-    .to({}, { duration: 0.5 }); // brief pause before prompts
+    .to({}, { duration: 0.5 }); // pause before prompts
 
-  // 3️⃣ Reflection Prompts (smooth crossfade transitions)
-  const promptBeat = (el, index) => {
+  // 3️⃣ Reflection prompts – with 0.2s crossfade overlap
+  const promptBeat = (el) => {
     if (!el) return;
-    const overlap = 0.2; // overlap for smoother crossfade
-    tl.to(el, { autoAlpha: 1, scale: 1, duration: 0.8, ease: "power2.out" })
-      .to({}, { duration: 2.0 }) // visible time
-      .to(el, { autoAlpha: 0, scale: 0.9, duration: 0.8, ease: "power2.in" }, `-=${overlap}`);
+    const overlap = 0.2;
+    tl.to(el, { autoAlpha: 1, duration: 0.8, ease: "power2.out" })
+      .to({}, { duration: 2.0 })
+      .to(el, { autoAlpha: 0, duration: 0.8, ease: "power2.in" }, `-=${overlap}`);
   };
   prompts.forEach(promptBeat);
 
-  // 4️⃣ Enter button fade-in AFTER prompts
+  // 4️⃣ Enter button appears only after all prompts
   tl.to(enterBtn, {
     autoAlpha: 1,
     duration: 1.0,
@@ -74,20 +76,19 @@ document.addEventListener("DOMContentLoaded", () => {
     onStart: () => {
       enterBtn.style.cursor = "pointer";
       enterBtn.style.pointerEvents = "auto";
-    },
-    onComplete: () => {
       console.log("✨ Oracle opening complete — Enter ready");
+      enableGlobalClick(); // activate click-anywhere only now
     }
   });
 
-  // ---- Run timeline after fonts/layout ready ----
+  // ---- Run timeline ----
   window.addEventListener("load", () => {
     console.log("▶️ Starting Oracle opening timeline");
     tl.play(0);
   });
 
   // ==============================================================
-  //  ENTER SEQUENCE  –  triggered by click
+  //  ENTER SEQUENCE – triggered by click
   // ==============================================================
 
   async function activateEntry() {
@@ -97,23 +98,23 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const enterTL = gsap.timeline({ defaults: { ease: "sine.inOut" } });
 
-    // hide enter immediately
+    // Hide Enter immediately
     if (enterBtn) enterTL.set(enterBtn, { autoAlpha: 0, pointerEvents: "none" });
 
-    // dissolve overlay + temple
+    // Dissolve overlay + temple
     if (overlay) enterTL.to(overlay, { autoAlpha: 0, duration: 0.8 }, 0);
     if (temple)  enterTL.to(temple,  { autoAlpha: 0, duration: 1.0 }, 0.2);
 
-    // fade title
+    // Fade title
     enterTL.to(title, { autoAlpha: 0, duration: 0.8 }, 0);
 
-    // Metatron forward motion
+    // Metatron zoom-in
     if (metatron) enterTL.to(metatron, { scale: 0.3, duration: 2.0, ease: "power3.inOut" }, 0.1);
 
-    // reveal shader
+    // Reveal shader
     if (shaderW) enterTL.to(shaderW, { autoAlpha: 1, duration: 1.5 }, "-=0.8");
 
-    // start background music
+    // Start background audio
     enterTL.add(async () => {
       if (!bg) return;
       try {
@@ -125,18 +126,29 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }, "-=1.0");
 
-    // show audio controls
+    // Show audio controls
     if (audioUI) enterTL.to(audioUI, { autoAlpha: 1, duration: 0.8, pointerEvents: "auto" }, "-=0.5");
   }
 
-  // ---- Click listeners ----
+  // ==============================================================
+  //  LISTENERS – delayed activation
+  // ==============================================================
+
+  // Click on Enter
   enterBtn?.addEventListener("click", (e) => {
     e.stopPropagation();
     activateEntry();
   });
-  document.addEventListener("click", (e) => {
-    if (!window.__AH_STARTED && !audioUI?.contains(e.target)) activateEntry();
-  });
+
+  // Enable global click only after timeline ready
+  function enableGlobalClick() {
+    document.addEventListener("click", (e) => {
+      if (!window.__AH_STARTED && !audioUI?.contains(e.target)) {
+        if (enterBtn) gsap.to(enterBtn, { autoAlpha: 0, duration: 0.3 }); // hide on global click
+        activateEntry();
+      }
+    });
+  }
 
   // ---- Audio controls ----
   btnSound?.addEventListener("click", async () => {
