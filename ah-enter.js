@@ -1,14 +1,13 @@
 /*--------------------------------------------------------------
-  Awakening Heart : Oracle Opening (v4.3)
-  Guarantees:
-  - Enter hidden & disabled until prompts complete
-  - Title fade/glow only (no scale)
-  - Global click enabled only after Enter reveal
-  - No first-paint flicker
+  Awakening Heart : Oracle Opening (v4.4)
+  Fixes:
+  - Force Enter button fully hidden at start
+  - Explicitly prevent title scaling
+  - Kill any CSS animations that might interfere
 --------------------------------------------------------------*/
 
 document.addEventListener("DOMContentLoaded", () => {
-  console.log("💠 Oracle Opening init v4.3");
+  console.log("💠 Oracle Opening init v4.4");
 
   // Elements
   const overlay   = document.getElementById("oracleOverlay") || document.getElementById("overlay");
@@ -23,21 +22,47 @@ document.addEventListener("DOMContentLoaded", () => {
   const btnSound  = document.getElementById("btnSound");
   const btnMute   = document.getElementById("btnMute");
 
-  // --- Safety: kill any CSS transitions that could fight our states ---
-  if (enterBtn) enterBtn.style.transition = "none";
+  // --- KILL ALL CSS ANIMATIONS/TRANSITIONS ---
+  // This prevents CSS from fighting with GSAP
+  if (enterBtn) {
+    enterBtn.style.transition = "none !important";
+    enterBtn.style.animation = "none !important";
+  }
+  if (title) {
+    title.style.transition = "none !important";
+    title.style.animation = "none !important";
+    title.style.transform = "none !important"; // Kill any CSS transforms
+  }
 
-  // --- First-paint states: avoid ANY flash ---
+  // --- FORCE ENTER BUTTON FULLY HIDDEN ---
+  if (enterBtn) { 
+    enterBtn.style.opacity = "0";
+    enterBtn.style.pointerEvents = "none";
+    enterBtn.style.visibility = "hidden";
+    enterBtn.style.display = "none"; // ADD THIS - most aggressive hiding
+  }
+
+  // --- First-paint states ---
   if (title)    title.style.opacity = "0";
   prompts.forEach(p => { if (p) p.style.opacity = "0"; });
-  if (enterBtn) { enterBtn.style.opacity = "0"; enterBtn.style.pointerEvents = "none"; enterBtn.style.visibility = "hidden"; }
   if (shaderW)  shaderW.style.opacity = "0";
   if (audioUI)  { audioUI.style.opacity = "0"; audioUI.style.pointerEvents = "none"; }
   if (bg)       { bg.pause(); bg.volume = 0; bg.muted = false; }
 
-  // Also pin GSAP baselines (no scale surprises)
-  if (title)   gsap.set(title,   { autoAlpha: 0, scale: 1 });
+  // --- GSAP baselines with explicit scale lock ---
+  if (title) {
+    gsap.set(title, { 
+      autoAlpha: 0, 
+      scale: 1,
+      transformOrigin: "center center",
+      force3D: false  // Prevent 3D transform layers
+    });
+  }
   prompts.forEach(p => p && gsap.set(p, { autoAlpha: 0, scale: 1 }));
-  if (enterBtn) gsap.set(enterBtn,{ autoAlpha: 0 });
+  if (enterBtn) gsap.set(enterBtn, { 
+    autoAlpha: 0,
+    display: "none"  // Keep it display:none initially
+  });
   if (shaderW)  gsap.set(shaderW, { autoAlpha: 0 });
   if (audioUI)  gsap.set(audioUI, { autoAlpha: 0 });
 
@@ -49,15 +74,30 @@ document.addEventListener("DOMContentLoaded", () => {
   // 1) Stillness
   tl.to({}, { duration: 1.0 });
 
-  // 2) Title: fade in -> glow -> settle  (NO SCALE)
+  // 2) Title: fade ONLY (explicitly no scale)
   if (title) {
-    tl.to(title, { autoAlpha: 1, duration: 1.0, ease: "power2.out" })
-      .to(title, { color: "hsl(268, 60%, 85%)", textShadow: "0 0 20px rgba(180,150,255,0.8)", duration: 1.0 })
-      .to(title, { color: "hsl(268, 50%, 60%)", textShadow: "none", duration: 1.0 })
-      .to({}, { duration: 0.5 });
+    tl.to(title, { 
+      autoAlpha: 1, 
+      scale: 1,  // Explicitly maintain scale: 1
+      duration: 1.0, 
+      ease: "power2.out" 
+    })
+    .to(title, { 
+      color: "hsl(268, 60%, 85%)", 
+      textShadow: "0 0 20px rgba(180,150,255,0.8)", 
+      scale: 1,  // Keep enforcing scale: 1
+      duration: 1.0 
+    })
+    .to(title, { 
+      color: "hsl(268, 50%, 60%)", 
+      textShadow: "none",
+      scale: 1,  // Still scale: 1
+      duration: 1.0 
+    })
+    .to({}, { duration: 0.5 });
   }
 
-  // 3) Prompts (centered stack assumed). Slight crossfade overlap.
+  // 3) Prompts
   const showPrompt = (el) => {
     if (!el) return;
     tl.to(el, { autoAlpha: 1, duration: 0.6, ease: "power2.out" })
@@ -66,18 +106,26 @@ document.addEventListener("DOMContentLoaded", () => {
   };
   prompts.forEach(showPrompt);
 
-  // 4) Reveal Enter ONLY after prompts, then enable global click
+  // 4) Reveal Enter ONLY after prompts complete
   if (enterBtn) {
     tl.add(() => {
-      // make sure pointer/visibility are restored just-in-time
+      // First restore display
+      enterBtn.style.display = "block";
+      gsap.set(enterBtn, { display: "block" });
+      
+      // Then restore interaction properties
       enterBtn.style.visibility = "visible";
       enterBtn.style.cursor = "pointer";
       enterBtn.style.pointerEvents = "auto";
     });
-    tl.to(enterBtn, { autoAlpha: 1, duration: 1.0, onComplete: () => {
-      globalClicksEnabled = true;
-      console.log("✨ Enter ready");
-    }});
+    tl.to(enterBtn, { 
+      autoAlpha: 1, 
+      duration: 1.0, 
+      onComplete: () => {
+        globalClicksEnabled = true;
+        console.log("✨ Enter ready");
+      }
+    });
   }
 
   // Start after layout/fonts
@@ -94,15 +142,20 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const enterTL = gsap.timeline({ defaults: { ease: "sine.inOut" } });
 
-    // Hide Enter immediately on any entry path
-    if (enterBtn) enterTL.set(enterBtn, { autoAlpha: 0, pointerEvents: "none", visibility: "hidden" });
+    // Hide Enter immediately
+    if (enterBtn) enterTL.set(enterBtn, { 
+      autoAlpha: 0, 
+      pointerEvents: "none", 
+      visibility: "hidden",
+      display: "none"
+    });
 
     // Dissolve overlay & temple
     if (overlay) enterTL.to(overlay, { autoAlpha: 0, duration: 0.8 }, 0);
     if (temple)  enterTL.to(temple,  { autoAlpha: 0, duration: 1.0 }, 0.2);
 
-    // Fade title
-    if (title) enterTL.to(title, { autoAlpha: 0, duration: 0.8 }, 0);
+    // Fade title (maintain scale)
+    if (title) enterTL.to(title, { autoAlpha: 0, scale: 1, duration: 0.8 }, 0);
 
     // Subtle Metatron zoom-in
     if (metatron) enterTL.to(metatron, { scale: 0.3, duration: 2.0, ease: "power3.inOut" }, 0.1);
@@ -132,15 +185,15 @@ document.addEventListener("DOMContentLoaded", () => {
     activateEntry();
   });
 
-  // Global click: ONLY after Enter is revealed
+  // Global click
   document.addEventListener("click", (e) => {
     if (!globalClicksEnabled) return;
-    if (audioUI?.contains(e.target)) return; // ignore sound buttons
-    // Hide Enter if it happens to be visible
-    if (enterBtn) gsap.to(enterBtn, { autoAlpha: 0, duration: 0.2, onComplete: () => {
-      enterBtn.style.pointerEvents = "none";
-      enterBtn.style.visibility = "hidden";
-    }});
+    if (audioUI?.contains(e.target)) return;
+    if (enterBtn) gsap.to(enterBtn, { 
+      autoAlpha: 0, 
+      display: "none",
+      duration: 0.2
+    });
     activateEntry();
   });
 
