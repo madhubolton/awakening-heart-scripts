@@ -1,6 +1,6 @@
 /*--------------------------------------------------------------
   Awakening Heart : Oracle Opening Sequence
-  Version 5.0 – Clean optimized cinematic version
+  Version 5.1 – Clean optimized cinematic version
   Author: Madhu Bolton
 --------------------------------------------------------------*/
 
