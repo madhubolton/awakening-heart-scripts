@@ -139,7 +139,13 @@ document.addEventListener("DOMContentLoaded", () => {
     gsap.to(bg, { volume: 0, duration: 0.3, onComplete: () => bg.pause() });
   });
 
-  window.addEventListener("load", () => {
+   window.addEventListener("load", () => {
+    // If an intro file is present, let it handle the reveal sequence
+    if (window.AH_INTRO_HANDLES_ENTER) {
+      console.log("🎬 ah-enter.js waiting for ah-intro.js timeline");
+      return;
+    }
+
     console.log("🎬 Starting cinematic timeline");
     tl.play(0);
   });
