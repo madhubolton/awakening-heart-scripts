@@ -1,23 +1,25 @@
 /*--------------------------------------------------------------
  🌺 Awakening Heart : Oracle Opening Sequence
- Version 5.6.7 | 2025-10-27
- Fixes flicker • Adds welcome prompt • Crossfade zoom • Shader + Metatron timing
+ Version 5.6.8 | 2025-10-27
+ - Fixes initial flicker
+ - Adds Welcome prompt
+ - Cross-fade zoom prompts with pauses
+ - Starts shader before temple dissolve
+ - Scales Metatron + audio fade-in
 --------------------------------------------------------------*/
 
 document.addEventListener("DOMContentLoaded", () => {
-  console.log("%c🌸 Awakening Heart : Oracle Opening initialized (v5.6.7)",
+  console.log("%c🌸 Awakening Heart : Oracle Opening initialized (v5.6.8)",
     "color:#b48ef5;font-weight:bold;");
 
   // --- Core DOM Elements ---
-  const overlay   = document.getElementById("oracleOverlay");
-  const temple    = document.getElementById("temple-container");
-  const title     = document.getElementById("ah-title");
-  const shaderW   = document.querySelector(".shader-wrapper");
-  const metatron  = document.getElementById("metatron");
-  const audioUI   = document.querySelector(".audio-buttons");
-  const bg        = document.getElementById("bgMusic");
-  const btnSound  = document.getElementById("btnSound");
-  const btnMute   = document.getElementById("btnMute");
+  const overlay  = document.getElementById("oracleOverlay");
+  const temple   = document.getElementById("temple-container");
+  const title    = document.getElementById("ah-title");
+  const shaderW  = document.querySelector(".shader-wrapper");
+  const metatron = document.getElementById("metatron");
+  const audioUI  = document.querySelector(".audio-buttons");
+  const bg       = document.getElementById("bgMusic");
 
   const prompts = [
     document.getElementById("prompt0"), // Welcome
@@ -27,8 +29,8 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("prompt4")  // You may enter
   ];
 
-  // --- Prevent flicker ---
-  gsap.set([title, ...prompts, shaderW, temple, metatron], {
+  // --- Safety + flicker prevention ---
+  gsap.set([title, ...prompts, shaderW, metatron], {
     autoAlpha: 0,
     visibility: "hidden"
   });
@@ -41,68 +43,64 @@ document.addEventListener("DOMContentLoaded", () => {
     onComplete: () => console.log("✨ Oracle intro complete – ready for entry")
   });
 
-  // 1️⃣ Title fade + gentle glow
+  // 1️⃣ Title fade & glow
   tl.set(title, { visibility: "visible" })
     .to(title, { autoAlpha: 1, duration: 1.2, ease: "sine.out" })
     .to(title, {
       color: "hsl(268,60%,90%)",
       textShadow: "0 0 24px rgba(180,120,255,0.6)",
-      duration: 1.4,
-      ease: "sine.inOut"
+      duration: 1.2
     })
     .to(title, {
-      color: "hsl(268,40%,70%)",
+      color: "hsl(268,45%,70%)",
       textShadow: "0 0 8px rgba(180,120,255,0.3)",
-      duration: 1.2,
-      ease: "sine.inOut"
+      duration: 1.0
     })
-    .addPause("+=0.4");
+    .addPause("+=0.5");
 
-  // 2️⃣ Prompt sequence – crossfade zooms
+  // 2️⃣ Prompt sequence – cross-fade zooms
   prompts.forEach((p, i) => {
     if (!p) return;
-    const delay = i === 0 ? 0 : 5; // prompt0 no pause; others 5s
 
-    tl.set(p, { visibility: "visible" });
+    const pause = i === 0 ? 0 : 5; // prompt0 no delay, others pause 5s
+    const zoomIn  = { scale: 0.85, autoAlpha: 0, visibility: "visible" };
+    const zoomMid = { scale: 1.0, autoAlpha: 1, duration: 1.4, ease: "power2.out" };
+    const zoomOut = { scale: 1.25, autoAlpha: 0, duration: 1.4, ease: "power2.in" };
 
-    // Zoom-in
-    tl.fromTo(p,
-      { scale: 0.8, autoAlpha: 0 },
-      { scale: 1.0, autoAlpha: 1, duration: 1.6, ease: "power2.out" }
-    );
+    tl.fromTo(p, zoomIn, zoomMid);
 
-    // Pause (except for last prompt)
-    if (i < prompts.length - 1) tl.addPause(`+=${delay}`);
-
-    // Zoom-out fade (except last prompt)
     if (i < prompts.length - 1) {
-      tl.to(p, { scale: 1.2, autoAlpha: 0, duration: 1.6, ease: "power2.in" });
+      tl.addPause(`+=${pause}`);
+      tl.to(p, zoomOut);
     }
   });
 
-  // 3️⃣ Final prompt stays visible until click
+  // 3️⃣ Final prompt waits for click
   const finalPrompt = prompts[prompts.length - 1];
-  finalPrompt.style.cursor = "pointer";
-  finalPrompt.addEventListener("click", () => {
-    console.log("🌌 Enter clicked – launching temple dissolve");
+  if (finalPrompt) {
+    finalPrompt.style.cursor = "pointer";
+    finalPrompt.addEventListener("click", () => {
+      console.log("🌌 Oracle entry clicked — dissolving temple…");
 
-    const enterTl = gsap.timeline({ defaults: { ease: "sine.inOut" } });
+      const enterTl = gsap.timeline({ defaults: { ease: "sine.inOut" } });
 
-    enterTl
-      // Shader starts slightly before temple dissolve
-      .to(shaderW, { autoAlpha: 1, duration: 1.2, ease: "power1.inOut" })
-      .to(temple,  { autoAlpha: 0, duration: 1.6, ease: "power1.inOut" }, "-=0.6")
-      .fromTo(metatron,
-        { scale: 0.66, autoAlpha: 0 },
-        { scale: 1, autoAlpha: 1, duration: 2.5, ease: "power2.out" },
-        "-=1.0"
-      )
-      .add(() => {
-        if (bg) {
-          bg.currentTime = 0;
-          bg.play();
-          gsap.to(bg, { volume: 0.35, duration: 1.5 });
-        }
-      });
-  });
+      enterTl
+        // Shader fade-in starts slightly before temple fade
+        .to(shaderW, { autoAlpha: 1, duration: 1.2 }, 0)
+        .to(temple,  { autoAlpha: 0, duration: 1.6 }, "-=0.6")
+        .fromTo(metatron,
+          { scale: 0.66, autoAlpha: 0, visibility: "visible" },
+          { scale: 1, autoAlpha: 1, duration: 2.5, ease: "power2.out" },
+          "-=1.0"
+        )
+        .add(() => {
+          if (bg) {
+            bg.currentTime = 0;
+            bg.play().then(() =>
+              gsap.to(bg, { volume: 0.35, duration: 1.5 })
+            ).catch(e => console.warn("Audio play blocked:", e));
+          }
+        });
+    });
+  }
 });
