@@ -40,15 +40,33 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   if (bg) { bg.pause(); bg.volume = 0; bg.muted = false; }
 
-  // --- GSAP timeline for Oracle opening ---
-  const tl = gsap.timeline({
-    defaults: { ease: "sine.inOut" },
-    onComplete: () => {
-      console.log("✨ Oracle opening complete — Enter ready");
-      gsap.to(enterBtn, { autoAlpha: 1, duration: 1, pointerEvents: "auto" });
+ // --- GSAP timeline for Oracle opening ---
+const tl = gsap.timeline({ defaults: { ease: "sine.inOut" } });
+
+tl.addLabel("start")
+
+  // Title fade-in (no zoom)
+  .to(title, { autoAlpha: 1, color: "#9666cc", duration: 1.2 }, "start+=0.5")
+  .to(title, { color: "#8359b2", duration: 1.5 }, ">")
+
+  .addLabel("prompts")
+
+  // Prompts sequence
+  .fromTo(prompts[0], { scale: 0.8, autoAlpha: 0 }, { scale: 1, autoAlpha: 1, duration: 0.8 }, "prompts+=0.2")
+  .to(prompts[0], { autoAlpha: 0, scale: 0.8, duration: 0.6 }, "+=2.0")
+  .fromTo(prompts[1], { scale: 0.8, autoAlpha: 0 }, { scale: 1, autoAlpha: 1, duration: 0.8 }, ">")
+  .to(prompts[1], { autoAlpha: 0, scale: 0.8, duration: 0.6 }, "+=2.0")
+  .fromTo(prompts[2], { scale: 0.8, autoAlpha: 0 }, { scale: 1, autoAlpha: 1, duration: 0.8 }, ">")
+  .to(prompts[2], { autoAlpha: 0, scale: 0.8, duration: 0.6 }, "+=2.0")
+
+  // ✨ Pause briefly after final prompt
+  .addPause("+=0.8")
+
+  // 🎯 Fade in the Enter button and enable clicks
+  .to(enterBtn, { autoAlpha: 1, duration: 1, pointerEvents: "auto", onStart: () => {
       document.body.style.cursor = "pointer";
-    }
-  });
+      console.log("✨ Oracle opening complete — Enter ready");
+  }});
 
   tl.addLabel("start")
     // Title fade-in (no zoom)
