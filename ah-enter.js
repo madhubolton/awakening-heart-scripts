@@ -1,13 +1,14 @@
 /*--------------------------------------------------------------
-  Awakening Heart : Oracle Entry Sequence (v5.5)
+  Awakening Heart : Oracle Entry Sequence (v5.6)
   --------------------------------------------------------------
-  Restores original "zoom out from center" animation
-  Adds the 4th invitation prompt
-  Smooth pacing and easing for cinematic timing
+  - Fix: prompt4 hidden on load
+  - Fix: title no longer inherits prompt zoom animation
+  - Keeps zoom-from-center emergence for prompts 1–3
+  - Adds graceful invitation for prompt4
 --------------------------------------------------------------*/
 
 document.addEventListener("DOMContentLoaded", () => {
-  console.log("🪶 Awakening Heart : Oracle Opening initialized (v5.5)");
+  console.log("🪶 Awakening Heart : Oracle Opening initialized (v5.6)");
 
   // --- Core Elements ---
   const overlay   = document.getElementById("oracleOverlay");
@@ -25,13 +26,26 @@ document.addEventListener("DOMContentLoaded", () => {
   const btnSound  = document.getElementById("btnSound");
   const btnMute   = document.getElementById("btnMute");
 
-  // --- Reset initial states ---
-  gsap.set([title, ...prompts, shaderW, audioUI], {
+  console.log("✨ Elements found:", { overlay, temple, title, prompts, shaderW, bg });
+
+  // --- Reset all elements ---
+  // Title has its own static transform origin and no scale
+  gsap.set(title, {
+    autoAlpha: 0,
+    transformOrigin: "50% 50%",
+    scale: 1,
+    pointerEvents: "none"
+  });
+
+  // Prompts start centered and hidden
+  gsap.set(prompts, {
     autoAlpha: 0,
     scale: 0.8,
     transformOrigin: "50% 50%",
     pointerEvents: "none"
   });
+
+  gsap.set([shaderW, audioUI], { autoAlpha: 0, pointerEvents: "none" });
   if (bg) { bg.pause(); bg.volume = 0; bg.muted = false; }
 
   // --- Timeline ---
@@ -43,7 +57,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   tl.addLabel("start")
 
-    // Title fade only (no zoom)
+    // Title fade-in only (no scale)
     .to(title, { autoAlpha: 1, color: "#9666cc", duration: 1.2 }, "start+=0.5")
     .to(title, { color: "#8359b2", duration: 1.5 }, ">")
 
@@ -73,24 +87,19 @@ document.addEventListener("DOMContentLoaded", () => {
     )
     .to(prompts[2], { autoAlpha: 0, scale: 0.9, duration: 0.6 }, "+=2.0")
 
-    // Prompt 4 — “You may enter”
-    .fromTo(prompts[3],
-      { scale: 0.8, autoAlpha: 0 },
-      {
-        scale: 1,
-        autoAlpha: 1,
-        duration: 1.2,
-        ease: "power2.out",
-        pointerEvents: "auto",
-        onStart: () => {
-          document.body.style.cursor = "pointer";
-          console.log("🕊️ Invitation prompt visible — awaiting click");
-        }
-      },
-      "+=1.0"
-    );
+    // Prompt 4 (invitation, fades in gently – no scale animation)
+    .to(prompts[3], {
+      autoAlpha: 1,
+      duration: 1.2,
+      ease: "sine.inOut",
+      pointerEvents: "auto",
+      onStart: () => {
+        document.body.style.cursor = "pointer";
+        console.log("🕊️ Invitation prompt visible — awaiting click");
+      }
+    }, "+=1.0");
 
-  // --- Click anywhere to enter ---
+  // --- Entry sequence ---
   async function activateEntry() {
     if (window.__AH_STARTED) return;
     window.__AH_STARTED = true;
@@ -118,6 +127,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (audioUI) gsap.to(audioUI, { autoAlpha: 1, duration: 0.8, pointerEvents: "auto" });
   }
 
+  // --- Click anywhere to enter ---
   document.addEventListener("click", (e) => {
     if (!window.__AH_STARTED && !audioUI?.contains(e.target)) activateEntry();
   });
