@@ -1,15 +1,13 @@
 /*--------------------------------------------------------------
   Awakening Heart : Oracle Opening Sequence
-  Version 5.6.11 | 2025-10-28
-  - Adds #prompt0 “Welcome”
-  - Hard initial states (no flicker)
-  - Prompts zoom-from-center, then invite click
-  - Click: remove overlay → shader beams on → dissolve temple
-           → Metatron scale 20→30vw → audio fade up
+  Version 5.7.0 | 2025-10-28
+  - Adds #prompt5 (additional prompt)
+  - Prompts "breathe" out from center (scale 0→1) and back in (scale 1→0)
+  - Cursor changes to pointer when click-anywhere is active
 --------------------------------------------------------------*/
 
 document.addEventListener("DOMContentLoaded", () => {
-  console.log("💖 Awakening Heart : Oracle Opening initialized (v5.6.6)");
+  console.log("💖 Awakening Heart : Oracle Opening initialized (v5.7.0)");
 
   // ------- Core DOM -------
   const overlay   = document.getElementById("oracleOverlay") || document.getElementById("overlay");
@@ -22,13 +20,14 @@ document.addEventListener("DOMContentLoaded", () => {
   const btnSound  = document.getElementById("btnSound");
   const btnMute   = document.getElementById("btnMute");
 
-  // Prompts (ensure these IDs exist in Webflow)
+  // Prompts (added prompt5)
   const prompts = [
     document.getElementById("prompt0"), // Welcome
     document.getElementById("prompt1"),
     document.getElementById("prompt2"),
     document.getElementById("prompt3"),
-    document.getElementById("prompt4")  // “You may enter. Click when ready.”
+    document.getElementById("prompt4"), // "You may enter. Click when ready."
+    document.getElementById("prompt5")  // New additional prompt (set as invite if this is your final one)
   ].filter(Boolean); // drop any nulls without breaking order
 
   console.log("🧩 Elements found:", { overlay, temple, title, shaderW, metatron, bg, audioUI, promptsLen: prompts.length });
@@ -45,10 +44,13 @@ document.addEventListener("DOMContentLoaded", () => {
   gsap.set(metatron,  { transformOrigin: "50% 50%", force3D: true });
   if (bg) { bg.pause(); bg.volume = 0; bg.muted = false; }
 
+  // Reset cursor to default initially
+  gsap.set(document.documentElement, { cursor: "default" });
+
   // Helper to turn on shader beams if your shader module exposes reveal()
   const revealShader = () => {
     if (window.AHShader?.reveal) {
-      window.AHShader.reveal({ beams: true }); // hint for “whose light beams”
+      window.AHShader.reveal({ beams: true }); // hint for "whose light beams"
     } else {
       gsap.to(shaderW, { autoAlpha: 1, duration: 0.6, ease: "sine.inOut" });
     }
@@ -61,8 +63,10 @@ document.addEventListener("DOMContentLoaded", () => {
     onComplete: () => {
       console.log("✨ Oracle intro complete — ready for entry");
       readyForClick = true;
-      // The invitation (#prompt4) is the on-screen cue that clicking anywhere continues
-      // We do NOT auto-hide it; it disappears as part of the click sequence below
+      // Change cursor to pointer when ready for click
+      gsap.set(document.documentElement, { cursor: "pointer" });
+      // Add visual hint on the overlay/document
+      if (overlay) gsap.set(overlay, { cursor: "pointer" });
     }
   });
 
@@ -71,23 +75,41 @@ document.addEventListener("DOMContentLoaded", () => {
     .to(title, { color: "hsl(268, 30%, 85%)", duration: 0.8 }, "<")
     .to(title, { color: "hsl(268, 50%, 60%)", duration: 1.0 });
 
-  // 2) Prompt carousel — zoom-from-center for each, then fade away
+  // 2) Prompt carousel — "breathe" out from center and back in
   prompts.forEach((p, idx) => {
     if (!p) return;
-    const isInvite = (p.id === "prompt4"); // “You may enter. Click when ready.”
-    // Each prompt appears from center, then fades. The invite remains visible.
+    
+    // Determine if this is the final invite prompt (now could be prompt5 instead of prompt4)
+    const isInvite = (idx === prompts.length - 1) || (p.id === "prompt4" && !document.getElementById("prompt5"));
+    
+    // "Breathe out" - scale from 0 (center point) to 1 (full size)
     tl.fromTo(p,
-      { autoAlpha: 0, scale: 0.9, y: 8 },
-      { autoAlpha: 1, scale: 1, y: 0, duration: 0.9, ease: "sine.out" }
+      { 
+        autoAlpha: 0, 
+        scale: 0,      // Start from center point (as if emerging from Metatron)
+        y: 0 
+      },
+      { 
+        autoAlpha: 1, 
+        scale: 1,      // Expand to full size
+        y: 0, 
+        duration: 1.2, 
+        ease: "power2.out" 
+      }
     );
+    
     if (!isInvite) {
-      tl.to(p, { autoAlpha: 0, duration: 0.6, ease: "sine.in" }, "+=1.0");
+      // "Breathe back in" - scale back to 0 while fading
+      tl.to(p, { 
+        autoAlpha: 0, 
+        scale: 0,      // Contract back to center
+        duration: 0.8, 
+        ease: "power2.in" 
+      }, "+=1.0");
     } else {
-      // leave the invite up and allow click-anywhere
-      tl.add(() => {
-        // make sure nothing else is clickable except the page itself
-        gsap.set(document.documentElement, { cursor: "pointer" });
-      }, "+=0.3");
+      // The invite stays visible at full size
+      // Just ensure it remains at scale 1
+      tl.set(p, { scale: 1 }, "+=0.3");
     }
   });
 
@@ -97,9 +119,12 @@ document.addEventListener("DOMContentLoaded", () => {
     sequenceStarted = true;
     console.log("🚪 Oracle entered");
 
-    // Hide invite prompt if it exists
-    const invite = document.getElementById("prompt4");
-    if (invite) gsap.to(invite, { autoAlpha: 0, duration: 0.3 });
+    // Reset cursor
+    gsap.set(document.documentElement, { cursor: "default" });
+
+    // Hide invite prompt (could be prompt4 or prompt5 now)
+    const invite = prompts[prompts.length - 1];
+    if (invite) gsap.to(invite, { autoAlpha: 0, scale: 0, duration: 0.3 });
 
     // Remove overlay → start shader beams → dissolve temple → scale Metatron 20→30vw → sound up
     const clickTl = gsap.timeline({ defaults: { ease: "sine.inOut" } });
