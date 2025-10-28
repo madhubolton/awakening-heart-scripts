@@ -1,43 +1,54 @@
 /*--------------------------------------------------------------
   Awakening Heart : Oracle Opening Sequence
-  Version 5.7.0 | 2025-10-28
-  - Adds #prompt5 (additional prompt)
+  Version 5.7.2 | 2025-10-28
+  - Fixed Metatron selector (using #metatron id)
   - Prompts "breathe" out from center (scale 0→1) and back in (scale 1→0)
-  - Cursor changes to pointer when click-anywhere is active
+  - Fixed initial flicker with immediate hide
+  - Added more delay for prompts 1-3 for contemplation
+  - Delayed temple dissolve by 0.5 sec
 --------------------------------------------------------------*/
 
 document.addEventListener("DOMContentLoaded", () => {
-  console.log("💖 Awakening Heart : Oracle Opening initialized (v5.7.0)");
+  console.log("💖 Awakening Heart : Oracle Opening initialized (v5.7.2)");
 
   // ------- Core DOM -------
   const overlay   = document.getElementById("oracleOverlay") || document.getElementById("overlay");
   const temple    = document.getElementById("temple-container");
   const title     = document.getElementById("ah-title");
   const shaderW   = document.querySelector(".shader-wrapper");
-  const metatron  = document.querySelector(".Metatron");
+  const metatron  = document.getElementById("metatron");  // FIXED: Using id selector
   const bg        = document.getElementById("bgMusic");
   const audioUI   = document.querySelector(".audio-buttons");
   const btnSound  = document.getElementById("btnSound");
   const btnMute   = document.getElementById("btnMute");
 
-  // Prompts (added prompt5)
+  // Prompts
   const prompts = [
     document.getElementById("prompt0"), // Welcome
     document.getElementById("prompt1"),
     document.getElementById("prompt2"),
     document.getElementById("prompt3"),
-    document.getElementById("prompt4"), // "You may enter. Click when ready."
-    document.getElementById("prompt5")  // New additional prompt (set as invite if this is your final one)
-  ].filter(Boolean); // drop any nulls without breaking order
+    document.getElementById("prompt4")  // "You may enter. Click when ready."
+  ].filter(Boolean);
 
   console.log("🧩 Elements found:", { overlay, temple, title, shaderW, metatron, bg, audioUI, promptsLen: prompts.length });
+
+  // ------- IMMEDIATE HIDE to prevent flicker -------
+  // Do this before GSAP initializes
+  prompts.forEach(p => {
+    if (p) {
+      p.style.visibility = 'hidden';
+      p.style.opacity = '0';
+    }
+  });
 
   // ------- Flags -------
   let readyForClick = false;
   let sequenceStarted = false;
 
   // ------- Initial states (no flicker, no early clicks) -------
-  gsap.set([title, ...prompts], { autoAlpha: 0, clearProps: "transform" });
+  gsap.set([title], { autoAlpha: 0, clearProps: "transform" });
+  gsap.set(prompts, { autoAlpha: 0, scale: 0, visibility: "hidden" }); // Ensure prompts start hidden and scaled to 0
   gsap.set(shaderW,   { autoAlpha: 0, pointerEvents: "none" });
   gsap.set(audioUI,   { autoAlpha: 0, pointerEvents: "none" });
   gsap.set([overlay, temple], { autoAlpha: 1 }); // visible at start
@@ -50,7 +61,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // Helper to turn on shader beams if your shader module exposes reveal()
   const revealShader = () => {
     if (window.AHShader?.reveal) {
-      window.AHShader.reveal({ beams: true }); // hint for "whose light beams"
+      window.AHShader.reveal({ beams: true });
     } else {
       gsap.to(shaderW, { autoAlpha: 1, duration: 0.6, ease: "sine.inOut" });
     }
@@ -65,7 +76,6 @@ document.addEventListener("DOMContentLoaded", () => {
       readyForClick = true;
       // Change cursor to pointer when ready for click
       gsap.set(document.documentElement, { cursor: "pointer" });
-      // Add visual hint on the overlay/document
       if (overlay) gsap.set(overlay, { cursor: "pointer" });
     }
   });
@@ -79,36 +89,40 @@ document.addEventListener("DOMContentLoaded", () => {
   prompts.forEach((p, idx) => {
     if (!p) return;
     
-    // Determine if this is the final invite prompt (now could be prompt5 instead of prompt4)
-    const isInvite = (idx === prompts.length - 1) || (p.id === "prompt4" && !document.getElementById("prompt5"));
+    const isInvite = (p.id === "prompt4");
+    
+    // Determine display duration based on prompt index
+    // Prompts 1, 2, 3 (indices 1, 2, 3) get more time
+    const displayDuration = (idx >= 1 && idx <= 3) ? "+=2.0" : "+=1.0";
     
     // "Breathe out" - scale from 0 (center point) to 1 (full size)
     tl.fromTo(p,
       { 
         autoAlpha: 0, 
-        scale: 0,      // Start from center point (as if emerging from Metatron)
-        y: 0 
+        scale: 0,
+        visibility: "hidden"
       },
       { 
         autoAlpha: 1, 
-        scale: 1,      // Expand to full size
-        y: 0, 
+        scale: 1,
+        visibility: "visible",
         duration: 1.2, 
-        ease: "power2.out" 
+        ease: "power2.out",
+        immediateRender: true  // Force immediate application of 'from' values
       }
     );
     
     if (!isInvite) {
       // "Breathe back in" - scale back to 0 while fading
+      // Use longer delay for prompts 1-3
       tl.to(p, { 
         autoAlpha: 0, 
-        scale: 0,      // Contract back to center
+        scale: 0,
         duration: 0.8, 
         ease: "power2.in" 
-      }, "+=1.0");
+      }, displayDuration);
     } else {
       // The invite stays visible at full size
-      // Just ensure it remains at scale 1
       tl.set(p, { scale: 1 }, "+=0.3");
     }
   });
@@ -122,7 +136,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // Reset cursor
     gsap.set(document.documentElement, { cursor: "default" });
 
-    // Hide invite prompt (could be prompt4 or prompt5 now)
+    // Hide invite prompt
     const invite = prompts[prompts.length - 1];
     if (invite) gsap.to(invite, { autoAlpha: 0, scale: 0, duration: 0.3 });
 
@@ -135,14 +149,12 @@ document.addEventListener("DOMContentLoaded", () => {
     // Start shader beams
     clickTl.add(revealShader, ">");
 
-    // Dissolve temple
-    if (temple) clickTl.to(temple, { autoAlpha: 0, duration: 0.9 }, ">-0.1");
+    // Dissolve temple (added 0.5 sec delay)
+    if (temple) clickTl.to(temple, { autoAlpha: 0, duration: 0.9 }, ">+0.5");
 
-    // Scale Metatron 20→30vw
+    // Scale Metatron 20→30vw (adjusted timing to account for temple delay)
     if (metatron) {
-      // If you control Metatron by vw via CSS, apply a transform scale as a visual match.
-      // Compute scale ratio ~ 30/20 = 1.5
-      clickTl.fromTo(metatron, { scale: 1 }, { scale: 1.5, duration: 1.2 }, ">-0.2");
+      clickTl.fromTo(metatron, { scale: 1 }, { scale: 1.5, duration: 1.2 }, ">-0.7");
     }
 
     // Audio fade up during scale
