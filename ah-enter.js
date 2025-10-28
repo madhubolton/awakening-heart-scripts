@@ -81,9 +81,9 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // 1) Title fade & glow (no zoom)
-  tl.to(title, { autoAlpha: 1, duration: 1.2 })
-    .to(title, { color: "hsl(268, 30%, 85%)", duration: 0.8 }, "<")
-    .to(title, { color: "hsl(268, 50%, 60%)", duration: 1.0 });
+  tl.to(title, { autoAlpha: 1, duration: 1.0 })
+    .to(title, { color: "hsl(268, 30%, 85%)", duration: 0.5 }, "<")
+    .to(title, { color: "hsl(268, 50%, 60%)", duration: 0.75 });
 
   // 2) Prompt carousel — "breathe" out from center and back in
   prompts.forEach((p, idx) => {
