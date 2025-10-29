@@ -1,7 +1,7 @@
 /*--------------------------------------------------------------
-  Awakening Heart : Audio Control (Cross-fade Version)
-  Version: 3.4 | Date: 2025-10-29
-  FIXED: Better embed detection with extended timeout
+  Awakening Heart : Audio Control (Single Icon Enhanced)
+  Version: 4.1 | Date: 2025-10-29
+  Uses only iconOn with better visual states
 --------------------------------------------------------------*/
 document.addEventListener('DOMContentLoaded', () => {
   const btnAudio = document.getElementById('btnAudio');
@@ -16,40 +16,43 @@ document.addEventListener('DOMContentLoaded', () => {
   const fadeIn  = () => gsap.to(bg, { volume: 0.35, duration: 1.2, ease: "sine.inOut" });
   const fadeOut = () => gsap.to(bg, { volume: 0, duration: 0.8, ease: "sine.inOut", onComplete: () => bg.pause() });
   
-  // 🔸 Enhanced: Wait longer for Webflow embeds with timeout
-  let attempts = 0;
-  const maxAttempts = 100; // Try for ~5 seconds
-  
-  const waitForIcons = () => {
-    const iconOn  = document.getElementById('iconOn');
-    const iconOff = document.getElementById('iconOff');
-    
-    attempts++;
-    
-    if (iconOn && iconOff) {
-      console.log(`✅ Both icons found after ${attempts} attempts`);
-      // Ensure they're both visible to GSAP
-      gsap.set([iconOn, iconOff], { visibility: "visible", opacity: 1 });
-      gsap.set(iconOff, { autoAlpha: 0 }); // start hidden
-      initAudioToggle(iconOn, iconOff);
-    } else if (attempts < maxAttempts) {
-      // Log what we're still waiting for
-      if (!iconOn) console.log(`⏳ Waiting for iconOn... (attempt ${attempts})`);
-      if (!iconOff) console.log(`⏳ Waiting for iconOff... (attempt ${attempts})`);
-      setTimeout(waitForIcons, 50); // Check every 50ms
+  const waitForIcon = () => {
+    const iconOn = document.getElementById('iconOn');
+    if (iconOn) {
+      console.log('✅ iconOn found, initializing single-icon mode');
+      gsap.set(iconOn, { visibility: "visible", opacity: 1 });
+      initAudioToggle(iconOn);
     } else {
-      console.error('❌ Timeout: Could not find both icons after 5 seconds');
-      console.log('iconOn:', iconOn);
-      console.log('iconOff:', iconOff);
-      // Fallback: work with whatever we have
-      if (iconOn) {
-        console.log('📌 Falling back to single-icon mode');
-        initSingleIconToggle(iconOn);
-      }
+      requestAnimationFrame(waitForIcon);
     }
   };
   
-  const initAudioToggle = (iconOn, iconOff) => {
+  const initAudioToggle = (icon) => {
+    // Add a visual indicator wrapper if it doesn't exist
+    const addSlashOverlay = () => {
+      if (!icon.querySelector('.audio-slash')) {
+        const slash = document.createElement('div');
+        slash.className = 'audio-slash';
+        slash.style.cssText = `
+          position: absolute;
+          width: 2px;
+          height: 140%;
+          background: currentColor;
+          top: -20%;
+          left: 50%;
+          transform: translateX(-50%) rotate(-45deg);
+          opacity: 0;
+          pointer-events: none;
+        `;
+        icon.style.position = 'relative';
+        icon.appendChild(slash);
+        return slash;
+      }
+      return icon.querySelector('.audio-slash');
+    };
+    
+    const slash = addSlashOverlay();
+    
     btnAudio.addEventListener('click', async () => {
       try {
         if (!isPlaying) {
@@ -60,47 +63,23 @@ document.addEventListener('DOMContentLoaded', () => {
           await bg.play();
           fadeIn();
           console.log('🎶 Audio started');
+          // Show audio is ON by removing slash
+          gsap.to(slash, { opacity: 0, duration: 0.3, ease: "sine.inOut" });
+          gsap.to(icon, { scale: 1.1, duration: 0.2, yoyo: true, repeat: 1 });
         } else {
           fadeOut();
           console.log('🔇 Audio paused');
-        }
-        isPlaying = !isPlaying;
-        
-        // Cross-fade icons
-        gsap.to(iconOn,  { autoAlpha: isPlaying ? 0 : 1, duration: 0.4, ease: "sine.inOut" });
-        gsap.to(iconOff, { autoAlpha: isPlaying ? 1 : 0, duration: 0.4, ease: "sine.inOut" });
-      } catch (e) {
-        console.warn('Audio toggle error:', e);
-      }
-    });
-    console.log('✅ Audio toggle initialized with both icons');
-  };
-  
-  // Fallback for single icon
-  const initSingleIconToggle = (icon) => {
-    btnAudio.addEventListener('click', async () => {
-      try {
-        if (!isPlaying) {
-          bg.pause();
-          bg.currentTime = 0;
-          bg.muted = false;
-          bg.volume = 0;
-          await bg.play();
-          fadeIn();
-          console.log('🎶 Audio started');
-          gsap.to(icon, { rotation: 180, duration: 0.4 });
-        } else {
-          fadeOut();
-          console.log('🔇 Audio paused');
-          gsap.to(icon, { rotation: 0, duration: 0.4 });
+          // Show audio is OFF by adding slash
+          gsap.to(slash, { opacity: 1, duration: 0.3, ease: "sine.inOut" });
         }
         isPlaying = !isPlaying;
       } catch (e) {
         console.warn('Audio toggle error:', e);
       }
     });
-    console.log('✅ Audio toggle initialized (single icon fallback)');
+    
+    console.log('✅ Audio toggle ready with visual states!');
   };
   
-  waitForIcons();
+  waitForIcon();
 });
