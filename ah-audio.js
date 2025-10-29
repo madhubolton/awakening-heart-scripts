@@ -1,56 +1,58 @@
 /*--------------------------------------------------------------
-  Awakening Heart : Audio Control
-  Handles ambient soundtrack unlock and mute functions.
-  Version: 2.0 | Date: 2025-10-24
+  Awakening Heart : Audio Control (Toggle Version)
+  Version: 3.0 | Date: 2025-10-29
+  Handles ambient soundtrack unlock + mute toggle.
   Notes:
-  - Simplified for stable playback (no audio-reactive logic)
+  - Replaces btnSound / btnSilent with single btnAudio
+  - Fades audio smoothly in/out using GSAP
+  - Swaps SVG icons (iconOn / iconOff) for visual feedback
   - Requires <audio id="bgMusic"> element in Webflow embed
-  - Works reliably with user gesture (Sound On button)
 --------------------------------------------------------------*/
 
 document.addEventListener('DOMContentLoaded', () => {
-  const btnSound  = document.getElementById('btnSound');
-  const btnSilent = document.getElementById('btnSilent');
-  const bg        = document.getElementById('bgMusic');
+  const btnAudio = document.getElementById('btnAudio');
+  const iconOn   = document.getElementById('iconOn');
+  const iconOff  = document.getElementById('iconOff');
+  const bg       = document.getElementById('bgMusic');
 
-  if (!bg) {
-    console.warn('🎧 No element with id="bgMusic" found.');
+  if (!bg || !btnAudio) {
+    console.warn('🎧 Missing audio elements (btnAudio or bgMusic).');
     return;
   }
 
-  const fadeIn = () => gsap.to(bg, { volume: 0.35, duration: 1.2 });
-  const fadeOut = () => gsap.to(bg, { volume: 0, duration: 0.8 });
+  let isPlaying = false;
 
-  // SOUND ON
-  btnSound?.addEventListener('click', async () => {
+  const fadeIn  = () => gsap.to(bg, { volume: 0.35, duration: 1.2, ease: 'sine.inOut' });
+  const fadeOut = () => gsap.to(bg, { volume: 0, duration: 0.8,  ease: 'sine.inOut', onComplete: () => bg.pause() });
+
+  btnAudio.addEventListener('click', async () => {
     try {
-      // reset and prepare
-      bg.pause();
-      bg.currentTime = 0;
-      bg.muted = false;
-      bg.volume = 0;
+      if (!isPlaying) {
+        // prepare + unlock audio context
+        bg.pause();
+        bg.currentTime = 0;
+        bg.muted = false;
+        bg.volume = 0;
 
-      // start playback once (must be user initiated)
-      await bg.play();
-      fadeIn();
-      console.log('🎶 Audio started');
+        // required for browser gesture unlock
+        await bg.play();
+        fadeIn();
+        console.log('🎶 Audio started');
 
-      // optional interface calls
-      window.AHOverlay?.hide();
-      window.AHShader?.reveal();
+        // optional interface hooks
+        window.AHOverlay?.hide?.();
+        window.AHShader?.reveal?.();
+      } else {
+        fadeOut();
+        console.log('🔇 Audio paused');
+      }
+
+      // toggle playback state + icons
+      isPlaying = !isPlaying;
+      iconOn.style.display  = isPlaying ? 'none'  : 'block';
+      iconOff.style.display = isPlaying ? 'block' : 'none';
     } catch (e) {
-      console.warn('Audio play failed:', e);
-    }
-  });
-
-  // SOUND OFF
-  btnSilent?.addEventListener('click', () => {
-    try {
-      fadeOut();
-      setTimeout(() => bg.pause(), 800);
-      console.log('🔇 Audio paused');
-    } catch (e) {
-      console.warn('Error stopping audio:', e);
+      console.warn('Audio toggle error:', e);
     }
   });
 });
