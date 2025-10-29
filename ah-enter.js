@@ -154,7 +154,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Scale Metatron 20→30vw (adjusted timing to account for temple delay)
     if (metatron) {
-      clickTl.fromTo(metatron, { scale: 1 }, { scale: 1.5, duration: 1.2 }, ">-0.7");
+      clickTl.fromTo(metatron, { scale: 1 }, { scale: 1.25, duration: 1.2 }, ">-0.7");
     }
 
     // Audio fade up during scale
