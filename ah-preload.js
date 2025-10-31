@@ -1,7 +1,8 @@
 /*--------------------------------------------------------------
   Awakening Heart : Preload + UI Setup
   Waits for temple-enter-button before animating.
-  Version: 1.2 | Date: 2025-10-25
+  Version: 2.0 | Date: 2025-10-31
+  - Updated for new audio toggle icon system
 --------------------------------------------------------------*/
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -9,8 +10,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const shaderW   = document.querySelector('.shader-wrapper');
   const overlay   = document.getElementById('overlay') || document.getElementById('oracleOverlay');
   const audioBtns = document.querySelector('.audio-buttons');
-  const btnSound  = document.getElementById('btnSound');
-  const btnMute   = document.getElementById('btnMute');
   const bg        = document.getElementById('bgMusic');
 
   // --- initial visibility states ---
@@ -20,7 +19,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // --- preload complete simulation ---
   window.addEventListener('load', () => {
 
-    // 🔸 wait until the enter button actually exists
+    // 📸 wait until the enter button actually exists
     const waitForEnter = () => {
       const enter = document.getElementById('temple-enter-button');
       if (enter) {
