@@ -1,18 +1,23 @@
 /*--------------------------------------------------------------
   Awakening Heart : Oracle Opening Sequence
-  Version 8.1.0 | 2025-11-13
+  Version 8.3.0 | 2025-11-14
   
-  Updates from v8.0.0:
+  Updates from v8.2.0:
+  - Metatron center (P_C) becomes clickable after opening sequence
+  - Click P_C to navigate to CMS scene (test: surrender-01)
+  - Hover effects on center portal
+  - Pulse animation before navigation
+  
+  Previous updates:
   - Enhanced audio debugging and error handling
   - Explicit unmute and source verification
-  - Triple goddess integration and animation
-  - Navigation toggle placeholder
+  - Triple goddess integration and animation (visual only)
   - Improved console logging for diagnostics
   - Consistent Metatron targeting (#metatron)
 --------------------------------------------------------------*/
 
 document.addEventListener("DOMContentLoaded", () => {
-  console.log("💖 Awakening Heart : Oracle Opening initialized (v8.1.0)");
+  console.log("💖 Awakening Heart : Oracle Opening initialized (v8.3.0)");
 
   // ------- Core DOM -------
   const overlay   = document.getElementById("oracleOverlay") || document.getElementById("overlay");
@@ -283,6 +288,59 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       }, ">-0.3"); // Slight overlap with audio UI
     }
+    
+    // 🎯 ENABLE METATRON CENTER CLICK (Navigate to CMS Scene)
+    clickTl.add(() => {
+      const metatronCenter = document.getElementById("P_C");
+      if (metatronCenter) {
+        // Make it clickable
+        gsap.set(metatronCenter, {
+          cursor: "pointer",
+          pointerEvents: "auto"
+        });
+        
+        // Add hover effect
+        metatronCenter.addEventListener("mouseenter", () => {
+          gsap.to(metatronCenter, {
+            scale: 1.08,
+            opacity: 1,
+            duration: 0.3,
+            transformOrigin: "center center"
+          });
+        });
+        
+        metatronCenter.addEventListener("mouseleave", () => {
+          gsap.to(metatronCenter, {
+            scale: 1,
+            opacity: 0.8,
+            duration: 0.3
+          });
+        });
+        
+        // Navigate to test scene on click
+        metatronCenter.addEventListener("click", (e) => {
+          e.stopPropagation();
+          console.log("🎯 Metatron center clicked - navigating to scene...");
+          
+          // Visual feedback before navigation
+          gsap.to(metatronCenter, {
+            scale: 1.15,
+            opacity: 1,
+            duration: 0.2,
+            yoyo: true,
+            repeat: 1,
+            onComplete: () => {
+              // Navigate to CMS scene
+              window.location.href = "https://awakening-heart.webflow.io/scenes/surrender-01";
+            }
+          });
+        });
+        
+        console.log("🎯 Metatron center now clickable - click to enter scene");
+      } else {
+        console.warn("⚠️ Metatron center (P_C) not found");
+      }
+    }, ">"); // After goddess reveal
   }
 
   document.addEventListener("click", (e) => {
