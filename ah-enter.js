@@ -1,19 +1,18 @@
 /*--------------------------------------------------------------
   Awakening Heart : Oracle Opening Sequence
-  Version 8.0.0 | 2025-10-31
-  - Updated for scene-specific audio files from Cloudflare
-  - Integrated persistent audio state management (user preference persists)
-  - Audio state saved to localStorage and applied to subsequent scenes
-  - Each scene loads its own audio file
-  - Fixed Metatron selector (using #metatron id)
-  - Prompts "breathe" out from center (scale 0→1) and back in (scale 1→0)
-  - Fixed initial flicker with immediate hide
-  - Added more delay for prompts 1-3 for contemplation
-  - Delayed temple dissolve by 0.5 sec
+  Version 8.1.0 | 2025-11-13
+  
+  Updates from v8.0.0:
+  - Enhanced audio debugging and error handling
+  - Explicit unmute and source verification
+  - Triple goddess integration and animation
+  - Navigation toggle placeholder
+  - Improved console logging for diagnostics
+  - Consistent Metatron targeting (#metatron)
 --------------------------------------------------------------*/
 
 document.addEventListener("DOMContentLoaded", () => {
-  console.log("💖 Awakening Heart : Oracle Opening initialized (v8.0.0)");
+  console.log("💖 Awakening Heart : Oracle Opening initialized (v8.1.0)");
 
   // ------- Core DOM -------
   const overlay   = document.getElementById("oracleOverlay") || document.getElementById("overlay");
@@ -23,12 +22,13 @@ document.addEventListener("DOMContentLoaded", () => {
   const metatron  = document.getElementById("metatron");
   const bg        = document.getElementById("bgMusic");
   const audioUI   = document.querySelector(".audio-buttons");
+  const goddess   = document.getElementById("triple-goddess-wrapper");
   
   // Audio toggle button with icon
   const audioToggle = document.getElementById("audioToggle");
   const icon = audioToggle?.querySelector('svg') || audioToggle?.querySelector('.icon-On');
 
-  // Get oracle scene audio URL
+  // Get oracle scene audio URL with fallback
   const oracleAudioUrl = bg?.getAttribute('data-scene-audio') || bg?.src;
 
   // Prompts
@@ -41,9 +41,34 @@ document.addEventListener("DOMContentLoaded", () => {
   ].filter(Boolean);
 
   console.log("🧩 Elements found:", { 
-    overlay, temple, title, shaderW, metatron, bg, audioUI, audioToggle, icon,
-    oracleAudioUrl, promptsLen: prompts.length 
+    overlay: !!overlay,
+    temple: !!temple,
+    title: !!title,
+    shaderW: !!shaderW,
+    metatron: !!metatron,
+    bg: !!bg,
+    audioUI: !!audioUI,
+    audioToggle: !!audioToggle,
+    icon: !!icon,
+    goddess: !!goddess,
+    promptsLen: prompts.length 
   });
+
+  // 🔍 AUDIO DIAGNOSTIC INFO
+  if (bg) {
+    console.log("🔍 Audio Debug:", {
+      element: "✅ Found",
+      src: bg.src,
+      dataSceneAudio: bg.getAttribute('data-scene-audio'),
+      oracleAudioUrl,
+      readyState: bg.readyState,
+      paused: bg.paused,
+      muted: bg.muted,
+      audioStateAvailable: !!window.AHAudioState
+    });
+  } else {
+    console.error("❌ No audio element (#bgMusic) found!");
+  }
 
   // ------- IMMEDIATE HIDE to prevent flicker -------
   prompts.forEach(p => {
@@ -62,6 +87,7 @@ document.addEventListener("DOMContentLoaded", () => {
   gsap.set(prompts, { autoAlpha: 0, scale: 0, visibility: "hidden" });
   gsap.set(shaderW,   { autoAlpha: 0, pointerEvents: "none" });
   gsap.set(audioUI,   { autoAlpha: 0, pointerEvents: "none" });
+  gsap.set(goddess,   { autoAlpha: 0, pointerEvents: "none" });
   gsap.set([overlay, temple], { autoAlpha: 1 });
   gsap.set(metatron,  { transformOrigin: "50% 50%", force3D: true });
   
@@ -74,6 +100,7 @@ document.addEventListener("DOMContentLoaded", () => {
     bg.muted = false;
     // Ensure oracle audio is loaded
     if (oracleAudioUrl && bg.src !== oracleAudioUrl) {
+      console.log("🔄 Setting audio source:", oracleAudioUrl);
       bg.src = oracleAudioUrl;
     }
   }
@@ -173,17 +200,40 @@ document.addEventListener("DOMContentLoaded", () => {
       clickTl.fromTo(metatron, { scale: 1 }, { scale: 1.25, duration: 1.2 }, ">-0.7");
     }
 
-    // Audio fade up during scale - start oracle scene audio
+    // 🎵 ENHANCED AUDIO FADE UP - Start oracle scene audio
     clickTl.add(async () => {
-      if (!bg) return;
+      if (!bg) {
+        console.error("❌ No audio element found");
+        return;
+      }
       
       const volumeLevel = window.AHAudioState?.VOLUME_LEVEL || 0.35;
       
+      // Ensure audio has correct source
+      if (oracleAudioUrl && bg.src !== oracleAudioUrl) {
+        console.log("🔄 Re-setting audio source:", oracleAudioUrl);
+        bg.src = oracleAudioUrl;
+        await new Promise(resolve => setTimeout(resolve, 200));
+      }
+      
+      console.log("🎵 Attempting to play audio:", {
+        src: bg.src,
+        readyState: bg.readyState,
+        paused: bg.paused,
+        muted: bg.muted
+      });
+      
       try {
-        // Start oracle scene audio from beginning
+        // Reset playback position and prepare audio
         bg.currentTime = 0;
         bg.volume = 0;
+        bg.muted = false; // Explicitly unmute
+        
+        // Attempt playback
         await bg.play();
+        console.log("✅ Audio play succeeded");
+        
+        // Fade up volume
         gsap.to(bg, { volume: volumeLevel, duration: 1.0 });
         
         // Save state as playing - this preference will persist to other scenes
@@ -191,11 +241,21 @@ document.addEventListener("DOMContentLoaded", () => {
           window.AHAudioState.setState(true, volumeLevel);
         }
         
+        // Visual feedback on icon
         if (icon) gsap.to(icon, { opacity: 1, duration: 0.4 });
+        
         console.log("🎵 Oracle audio started (state saved for journey)");
       } catch (e) {
-        console.warn("Audio play blocked:", e);
+        console.error("❌ Audio play failed:", {
+          error: e.message,
+          name: e.name,
+          readyState: bg.readyState,
+          networkState: bg.networkState
+        });
+        
+        // Update state to reflect failure
         if (window.AHAudioState) window.AHAudioState.setState(false);
+        if (icon) gsap.set(icon, { opacity: 0.4 });
       }
     }, "<");
 
@@ -207,11 +267,28 @@ document.addEventListener("DOMContentLoaded", () => {
         gsap.set(audioUI, { pointerEvents: "auto" });
       }
     });
+
+    // 🌙 REVEAL TRIPLE GODDESS (Navigation Element)
+    if (goddess) {
+      clickTl.to(goddess, {
+        autoAlpha: 1,
+        duration: 0.8,
+        ease: "sine.inOut",
+        onStart: () => {
+          goddess.classList.add("active");
+        },
+        onComplete: () => {
+          gsap.set(goddess, { pointerEvents: "auto" });
+          console.log("🌙 Triple Goddess navigation revealed");
+        }
+      }, ">-0.3"); // Slight overlap with audio UI
+    }
   }
 
   document.addEventListener("click", (e) => {
     if (!readyForClick) return;
     if (audioUI && audioUI.contains(e.target)) return;
+    if (goddess && goddess.contains(e.target)) return; // Don't trigger on goddess click
     enterSequence();
   });
 
@@ -224,7 +301,7 @@ document.addEventListener("DOMContentLoaded", () => {
       await window.AHAudioState.toggle(bg, icon);
     } else {
       // Fallback to local toggle (if state manager not loaded)
-      console.warn("AHAudioState not found, using local toggle");
+      console.warn("⚠️ AHAudioState not found, using local toggle");
       const isPlaying = !bg.paused;
       
       if (isPlaying) {
@@ -241,4 +318,42 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
   });
+
+  // ------- Triple Goddess Navigation Toggle -------
+  goddess?.addEventListener("click", (e) => {
+    e.stopPropagation(); // Prevent triggering entry sequence
+    console.log("🌙 Goddess navigation toggle clicked");
+    
+    // Visual feedback - pulse the full moon
+    const fullCircle = document.querySelector("#triple-goddess #full-circle");
+    if (fullCircle) {
+      gsap.to(fullCircle, {
+        scale: 1.15,
+        duration: 0.2,
+        yoyo: true,
+        repeat: 1,
+        transformOrigin: "50% 50%",
+        ease: "power2.inOut"
+      });
+    }
+    
+    // TODO: Toggle navigation overlay
+    // Future implementation will show/hide realm navigation
+    console.log("📍 Navigation toggle (not yet implemented)");
+  });
+
+  // ------- Optional: Subtle Goddess Animation Loop -------
+  // Uncomment to add gentle breathing animation to goddess symbol
+  /*
+  if (goddess) {
+    gsap.to("#triple-goddess .moon", {
+      opacity: 0.7,
+      duration: 2.5,
+      stagger: 0.3,
+      repeat: -1,
+      yoyo: true,
+      ease: "sine.inOut"
+    });
+  }
+  */
 });
