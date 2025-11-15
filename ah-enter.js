@@ -300,27 +300,25 @@ document.addEventListener("DOMContentLoaded", () => {
     const goddessLabel = divinationTl.addLabel("goddessDescend");
     
     if (goddess) {
-      // Calculate landing position: bottom of screen
-      const vh = window.innerHeight;
-      const goddessLandingY = vh * 0.4; // Adjust as needed
+      // Goddess is already at bottom from entry - just scale down and subtle settle
       
+      // Scale down in place
       divinationTl.to(goddess, {
-        y: goddessLandingY,
         scale: 0.7,
         duration: 1.2,
         ease: "power2.inOut",
         transformOrigin: "50% 50%"
       }, goddessLabel);
       
-      // Micro-bounce - very subtle
+      // Micro-bounce - very subtle settle (just scale, no Y movement)
       divinationTl.to(goddess, {
-        y: goddessLandingY - 4,
+        scale: 0.68, // Tiny compression
         duration: 0.2,
         ease: "power1.out"
       }, goddessLabel + "+=1.2");
       
       divinationTl.to(goddess, {
-        y: goddessLandingY,
+        scale: 0.7, // Back to target
         duration: 0.2,
         ease: "power1.in"
       }, goddessLabel + "+=1.4");
@@ -337,10 +335,10 @@ document.addEventListener("DOMContentLoaded", () => {
     const growLabel = divinationTl.addLabel("metatronGrow");
     
     if (metatron) {
-      // Lazy spin and scale to 120%
+      // Lazy spin and scale UP (from 1.25 to 1.5 = 120% increase)
       divinationTl.to(metatron, {
         rotation: 360,
-        scale: 1.2,
+        scale: 1.5,  // Grow from 1.25 to 1.5 (120% of 1.25)
         duration: 2.5,
         ease: "power1.inOut",
         transformOrigin: "50% 50%"
@@ -372,10 +370,10 @@ document.addEventListener("DOMContentLoaded", () => {
     const stopLabel = divinationTl.addLabel("rotationStop", "metatronGrow+=2.5");
     
     if (metatron) {
-      // Ensure we're at exactly 120% and rotation stops
+      // Lock in final scale, no rotation change (stay at 360°)
       divinationTl.to(metatron, {
-        scale: 1.2,
-        rotation: "+=0", // Hold current rotation
+        scale: 1.5,
+        // Don't animate rotation - let it stay at 360°
         duration: 0.3,
         ease: "power2.out"
       }, stopLabel);
@@ -432,10 +430,10 @@ document.addEventListener("DOMContentLoaded", () => {
     const dissolveLabel = divinationTl.addLabel("dissolution");
     
     if (metatron) {
-      // Rotate and shrink to void
+      // Rotate and shrink to void (from 1.5 to 0.01)
       divinationTl.to(metatron, {
         scale: 0.01,
-        rotation: "+=180", // Gentle rotation
+        rotation: "+=180", // Gentle rotation (360° → 540°)
         duration: 2.5,
         ease: "power2.in",
         transformOrigin: "50% 50%"
