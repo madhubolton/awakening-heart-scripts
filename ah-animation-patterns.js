@@ -252,7 +252,7 @@ window.AHPatterns = (() => {
   /**
    * PATTERN: Goddess Phases
    * Triple goddess cycles through moon phases
-   * Waxing → Full → Waning
+   * Waxing â†’ Full â†’ Waning
    */
   const goddessPhases = (options = {}) => {
     const opts = {
@@ -367,4 +367,4 @@ window.AHPatterns = (() => {
   };
 })();
 
-console.log("🎨 Animation Patterns Library loaded");
+console.log("ðŸŽ¨ Animation Patterns Library loaded");
