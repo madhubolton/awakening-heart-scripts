@@ -1,31 +1,34 @@
 /*--------------------------------------------------------------
   Awakening Heart : Oracle Opening Sequence
-  Version: 9.0.1 | 2025-11-15
+  Version: 9.1.0 | 2025-11-15
   
   TRIGGER POINTS:
-  1. Click to enter (after prompts) → EXISTING entry behavior (unchanged)
+  1. Click to enter (after prompts) → Entry behavior (unchanged)
      - Overlay fades, temple dissolves, Metatron scales up
      - Shader reveals, audio starts, goddess appears
      - Metatron center becomes clickable
   
-  2. Click Metatron center (P_C) → REFINED DIVINATION SEQUENCE
-     - Release → Isolation → Solo → Dissolution → Void
-     - Then navigates to CMS scene
+  2. Click Metatron center (P_C) → REVISED DIVINATION SEQUENCE
+     Step 1: Goddess descends (1.2s + pause)
+     Step 2: Metatron grows & rotates (2.5s)
+             - Title & goddess dissolve during this
+     Step 3: Rotation stops (0.3s + pause)
+     Step 4: Facets animate (4.5s - watch for several seconds)
+     Step 5: Dissolution (2.5s - rotate & shrink)
+     Step 6: Void (0.5s hold)
+     Total: ~12 seconds
   
-  Updates from v9.0.0:
-  - Corrected trigger point for refined sequence
-  - Sequence now triggered by Metatron center click (not entry click)
-  - Entry behavior restored to original (unchanged)
-  
-  Previous updates:
-  - v9.0.0: Refined 5-step sequence choreography
-  - v8.3.0: Metatron center clickable navigation
-  - v8.2.0: Audio state persistence
-  - Triple goddess integration
+  Updates from v9.0.1:
+  - Slowed down overall pace with pauses
+  - Goddess descends first (separate step)
+  - Title/goddess dissolve WHILE Metatron grows
+  - Rotation stops BEFORE facets animate
+  - Longer facet display time (4.5s total)
+  - Contemplative pacing throughout
 --------------------------------------------------------------*/
 
 document.addEventListener("DOMContentLoaded", () => {
-  console.log("💖 Awakening Heart : Oracle Opening initialized (v9.0.1)");
+  console.log("💖 Awakening Heart : Oracle Opening initialized (v9.1.0)");
 
   // ------- Core DOM -------
   const overlay   = document.getElementById("oracleOverlay") || document.getElementById("overlay");
@@ -280,7 +283,7 @@ document.addEventListener("DOMContentLoaded", () => {
       gsap.set(metatronCenter, { pointerEvents: "none" });
     }
 
-    // ------- THE REFINED SEQUENCE -------
+    // ------- THE REFINED SEQUENCE (REVISED) -------
     const divinationTl = gsap.timeline({ 
       defaults: { ease: "sine.inOut" },
       onComplete: () => {
@@ -291,111 +294,107 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     // ============================================================
-    // STEP 1: THE RELEASE (0.8-1s)
-    // Goddess drops + micro-bounce, Metatron begins lazy spin/scale
+    // STEP 1: GODDESS DESCENDS (1.2s)
+    // Goddess scales down and moves to bottom
     // ============================================================
-    const releaseLabel = divinationTl.addLabel("release");
+    const goddessLabel = divinationTl.addLabel("goddessDescend");
     
     if (goddess) {
-      // Calculate landing position: just above bottom of screen
+      // Calculate landing position: bottom of screen
       const vh = window.innerHeight;
-      const goddessLandingY = vh * 0.4; // Adjust based on your layout
+      const goddessLandingY = vh * 0.4; // Adjust as needed
       
       divinationTl.to(goddess, {
         y: goddessLandingY,
         scale: 0.7,
-        duration: 0.9,
-        ease: "power2.in", // Drop with weight
+        duration: 1.2,
+        ease: "power2.inOut",
         transformOrigin: "50% 50%"
-      }, releaseLabel);
+      }, goddessLabel);
       
-      // Micro-bounce - very subtle, like silk settling
+      // Micro-bounce - very subtle
       divinationTl.to(goddess, {
-        y: goddessLandingY - 4, // Tiny 4px bounce
-        duration: 0.15,
+        y: goddessLandingY - 4,
+        duration: 0.2,
         ease: "power1.out"
-      }, releaseLabel + "+=0.9");
+      }, goddessLabel + "+=1.2");
       
       divinationTl.to(goddess, {
         y: goddessLandingY,
-        duration: 0.15,
+        duration: 0.2,
         ease: "power1.in"
-      }, releaseLabel + "+=1.05");
+      }, goddessLabel + "+=1.4");
     }
     
-    // Metatron begins lazy spin and scale toward 120%
+    // Small pause after goddess lands
+    divinationTl.to({}, { duration: 0.3 });
+
+    // ============================================================
+    // STEP 2: METATRON GROWS & ROTATES (2.5s)
+    // Lazy rotation begins, grows to 120%
+    // Title and Goddess dissolve WHILE this happens
+    // ============================================================
+    const growLabel = divinationTl.addLabel("metatronGrow");
+    
     if (metatron) {
+      // Lazy spin and scale to 120%
       divinationTl.to(metatron, {
         rotation: 360,
         scale: 1.2,
-        duration: 1.0,
+        duration: 2.5,
         ease: "power1.inOut",
         transformOrigin: "50% 50%"
-      }, releaseLabel);
+      }, growLabel);
     }
     
-    // Temple dissolves during release
-    if (temple) {
-      divinationTl.to(temple, { 
-        autoAlpha: 0, 
-        duration: 0.8 
-      }, releaseLabel + "+=0.2");
+    // Title dissolves DURING the grow (starts 0.5s into the grow)
+    if (title) {
+      divinationTl.to(title, {
+        autoAlpha: 0,
+        duration: 1.0,
+        ease: "power2.in"
+      }, growLabel + "+=0.5");
     }
-
-    // ============================================================
-    // STEP 2: THE ISOLATION (0.5-0.7s)
-    // Title and Goddess fade out, spin accelerates, stage clears
-    // ============================================================
-    const isolationLabel = divinationTl.addLabel("isolation", "release+=1.0");
     
-    // Title fades out
-    divinationTl.to(title, {
-      autoAlpha: 0,
-      duration: 0.6,
-      ease: "power2.in"
-    }, isolationLabel);
-    
-    // Goddess fades out (even though she's landed)
+    // Goddess dissolves DURING the grow (starts 0.5s into the grow)
     if (goddess) {
       divinationTl.to(goddess, {
         autoAlpha: 0,
-        duration: 0.6,
+        duration: 1.0,
         ease: "power2.in"
-      }, isolationLabel);
-    }
-    
-    // Spin accelerates (continue rotation, slight speed increase)
-    if (metatron) {
-      divinationTl.to(metatron, {
-        rotation: "+=180", // Additional rotation
-        ease: "power2.in",
-        duration: 0.6
-      }, isolationLabel);
+      }, growLabel + "+=0.5");
     }
 
     // ============================================================
-    // STEP 3: THE SOLO PERFORMANCE (0.6-0.8s)
-    // Metatron at 120%, spin STOPS, facets display - pure focus
+    // STEP 3: ROTATION STOPS (0.3s)
+    // Metatron reaches 120%, rotation stops
     // ============================================================
-    const soloLabel = divinationTl.addLabel("solo", "isolation+=0.6");
+    const stopLabel = divinationTl.addLabel("rotationStop", "metatronGrow+=2.5");
     
-    // Ensure Metatron is exactly at 120% and rotation stops
     if (metatron) {
+      // Ensure we're at exactly 120% and rotation stops
       divinationTl.to(metatron, {
         scale: 1.2,
-        rotation: "+=0", // Stop rotation by setting to current
-        duration: 0.2,
+        rotation: "+=0", // Hold current rotation
+        duration: 0.3,
         ease: "power2.out"
-      }, soloLabel);
+      }, stopLabel);
     }
     
-    // FACETS ANIMATE - The theatrical peak
+    // Brief pause at stillness
+    divinationTl.to({}, { duration: 0.4 });
+
+    // ============================================================
+    // STEP 4: FACET ANIMATION (3-4s)
+    // Facets animate, we watch for several seconds
+    // ============================================================
+    const facetsLabel = divinationTl.addLabel("facets");
+    
+    // FACETS ANIMATE
     divinationTl.add(() => {
       console.log("✨ Facets display beginning");
       
-      // Use animation patterns library if available
       if (window.AHPatterns) {
-        // Get facet IDs from your Metatron
         const facetIds = [
           "F_O_TRI1_T", "F_O_TRI2_T",
           "F_I_BG_TR", "F_I_OCT_TR", "F_I_TRI1_TR", "F_I_TRI2_TR",
@@ -410,62 +409,58 @@ document.addEventListener("DOMContentLoaded", () => {
           "F_I_OCT_TL", "F_I_BG_TL"
         ];
         
-        // Play sequential pattern with custom colors
+        // Slower, more contemplative pattern
         window.AHPatterns.sequential(facetIds, {
           fill: "#77ffcc",
-          duration: 0.6,
-          stagger: 0.025, // Quick succession
-          repeat: 0, // Just once for divination
+          duration: 1.2,
+          stagger: 0.08, // Slower stagger
+          repeat: 0,
           yoyo: false,
-          ease: "power2.out"
+          ease: "sine.inOut"
         });
       }
-    }, soloLabel + "+=0.2");
+    }, facetsLabel);
     
-    // Hold at solo performance for theatrical moment
-    divinationTl.to({}, { duration: 0.7 }, soloLabel);
+    // Hold to watch the facet animation complete and linger
+    // 24 facets * 0.08 stagger = ~2s for sequence + 1.2s duration + 1s hold = ~4.2s total
+    divinationTl.to({}, { duration: 4.5 }, facetsLabel);
 
     // ============================================================
-    // STEP 4: THE DISSOLUTION (1.5-2s)
-    // Metatron scales 120% → 1%, gentle rotation resumes
+    // STEP 5: DISSOLUTION (2.5s)
+    // Metatron rotates again and shrinks to center
     // ============================================================
-    const dissolutionLabel = divinationTl.addLabel("dissolution", "solo+=0.8");
+    const dissolveLabel = divinationTl.addLabel("dissolution");
     
     if (metatron) {
-      // Scale down to near-void
+      // Rotate and shrink to void
       divinationTl.to(metatron, {
-        scale: 0.01, // 1% scale
-        rotation: "+=90", // Gentle rotation resumes
-        duration: 1.8,
+        scale: 0.01,
+        rotation: "+=180", // Gentle rotation
+        duration: 2.5,
         ease: "power2.in",
         transformOrigin: "50% 50%"
-      }, dissolutionLabel);
+      }, dissolveLabel);
     }
     
     // Fade out facets during dissolution
     divinationTl.add(() => {
-      if (window.AHPatterns) {
-        // Fade all facets back to original state
-        const allShapes = document.querySelectorAll('#metatron polygon, #metatron polyline');
-        gsap.to(allShapes, {
-          opacity: 0,
-          duration: 1.2,
-          ease: "power2.in"
-        });
-      }
-    }, dissolutionLabel + "+=0.3");
+      const allShapes = document.querySelectorAll('#metatron polygon, #metatron polyline');
+      gsap.to(allShapes, {
+        opacity: 0,
+        duration: 1.8,
+        ease: "power2.in"
+      });
+    }, dissolveLabel + "+=0.5");
 
     // ============================================================
-    // STEP 5: THE VOID (0.1-0.2s)
-    // 1% - point of light, ready for scene swap
+    // STEP 6: THE VOID (0.5s)
+    // Brief hold at void before navigation
     // ============================================================
-    const voidLabel = divinationTl.addLabel("void", "dissolution+=1.8");
+    const voidLabel = divinationTl.addLabel("void");
     
-    // Brief hold at void state
-    divinationTl.to({}, { duration: 0.15 }, voidLabel);
+    divinationTl.to({}, { duration: 0.5 }, voidLabel);
     
-    // Timeline onComplete will navigate to scene (defined above)
-    console.log("🌀 Void reached - preparing for scene transition");
+    console.log("🌀 Entering void - preparing for scene transition");
   }
 
   // ------- Enable Metatron Center Navigation -------
