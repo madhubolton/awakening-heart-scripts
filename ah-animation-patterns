@@ -1,0 +1,370 @@
+/*--------------------------------------------------------------
+  Awakening Heart : Animation Patterns Library
+  Version: 1.0.0 | Date: 2025-11-15
+  
+  Reusable animation choreography for:
+  - Metatron facets (F_* elements)
+  - Portal elements (P_* elements)  
+  - Triple Goddess (crescent and circle elements)
+  
+  Usage:
+  window.AHPatterns.playPattern('sequential', facetIds, options);
+--------------------------------------------------------------*/
+
+window.AHPatterns = (() => {
+  
+  // Default animation options
+  const DEFAULTS = {
+    fill: "#77ffcc",
+    duration: 1.5,
+    stagger: 0.1,
+    repeat: -1,
+    yoyo: true,
+    ease: "sine.inOut"
+  };
+
+  /**
+   * Get the animatable shape from an element (handles groups)
+   */
+  const getShape = (id) => {
+    const element = document.getElementById(id);
+    if (!element) return null;
+    
+    // If it's a group, find the shape inside
+    return element.tagName === 'g' 
+      ? element.querySelector('polygon, polyline, path, circle') 
+      : element;
+  };
+
+  /**
+   * PATTERN: Sequential
+   * Elements light up one after another in order
+   */
+  const sequential = (ids, options = {}) => {
+    const opts = { ...DEFAULTS, ...options };
+    
+    ids.forEach((id, i) => {
+      const shape = getShape(id);
+      if (!shape) return;
+      
+      gsap.to(shape, {
+        fill: opts.fill,
+        duration: opts.duration,
+        repeat: opts.repeat,
+        yoyo: opts.yoyo,
+        ease: opts.ease,
+        delay: i * opts.stagger
+      });
+    });
+    
+    return ids.length * opts.stagger + opts.duration;
+  };
+
+  /**
+   * PATTERN: Radial Burst
+   * Elements light up from center outward in waves
+   * Requires groups: center, inner, outer
+   */
+  const radialBurst = (groups, options = {}) => {
+    const opts = { ...DEFAULTS, ...options };
+    const sequence = ['center', 'inner', 'outer'];
+    let totalDelay = 0;
+    
+    sequence.forEach((groupName, waveIndex) => {
+      const ids = groups[groupName] || [];
+      
+      ids.forEach((id, i) => {
+        const shape = getShape(id);
+        if (!shape) return;
+        
+        gsap.to(shape, {
+          fill: opts.fill,
+          duration: opts.duration,
+          repeat: opts.repeat,
+          yoyo: opts.yoyo,
+          ease: opts.ease,
+          delay: totalDelay + (i * opts.stagger)
+        });
+      });
+      
+      totalDelay += (ids.length * opts.stagger) + (opts.groupDelay || 0.3);
+    });
+    
+    return totalDelay;
+  };
+
+  /**
+   * PATTERN: Wave (Left to Right or Top to Bottom)
+   * Elements light up in a sweeping wave pattern
+   */
+  const wave = (ids, options = {}) => {
+    const opts = { ...DEFAULTS, direction: 'horizontal', ...options };
+    
+    // For wave, we might want to sort by position
+    // This is a simplified version - assumes ids are already in wave order
+    return sequential(ids, opts);
+  };
+
+  /**
+   * PATTERN: Spiral
+   * Elements light up in a spiral pattern from outside to center
+   */
+  const spiral = (ids, options = {}) => {
+    const opts = { ...DEFAULTS, inward: true, ...options };
+    
+    // Reverse order for inward spiral
+    const orderedIds = opts.inward ? [...ids].reverse() : ids;
+    
+    orderedIds.forEach((id, i) => {
+      const shape = getShape(id);
+      if (!shape) return;
+      
+      gsap.to(shape, {
+        fill: opts.fill,
+        duration: opts.duration,
+        repeat: opts.repeat,
+        yoyo: opts.yoyo,
+        ease: opts.ease,
+        delay: i * opts.stagger
+      });
+    });
+    
+    return orderedIds.length * opts.stagger + opts.duration;
+  };
+
+  /**
+   * PATTERN: Random Sparkle
+   * Elements light up in random order with variation
+   */
+  const randomSparkle = (ids, options = {}) => {
+    const opts = { ...DEFAULTS, ...options };
+    
+    // Shuffle ids for random order
+    const shuffled = [...ids].sort(() => Math.random() - 0.5);
+    
+    shuffled.forEach((id, i) => {
+      const shape = getShape(id);
+      if (!shape) return;
+      
+      // Add some randomness to duration and delay
+      const randomDuration = opts.duration * (0.8 + Math.random() * 0.4);
+      const randomDelay = (i * opts.stagger) + (Math.random() * 0.2);
+      
+      gsap.to(shape, {
+        fill: opts.fill,
+        duration: randomDuration,
+        repeat: opts.repeat,
+        yoyo: opts.yoyo,
+        ease: opts.ease,
+        delay: randomDelay
+      });
+    });
+    
+    return shuffled.length * opts.stagger + opts.duration;
+  };
+
+  /**
+   * PATTERN: Pulse All
+   * All elements pulse together in sync
+   */
+  const pulseAll = (ids, options = {}) => {
+    const opts = { ...DEFAULTS, stagger: 0, ...options };
+    
+    ids.forEach((id) => {
+      const shape = getShape(id);
+      if (!shape) return;
+      
+      gsap.to(shape, {
+        fill: opts.fill,
+        duration: opts.duration,
+        repeat: opts.repeat,
+        yoyo: opts.yoyo,
+        ease: opts.ease,
+        delay: opts.stagger
+      });
+    });
+    
+    return opts.duration;
+  };
+
+  /**
+   * PATTERN: Binary (Alternating On/Off)
+   * Elements alternate between two states
+   */
+  const binary = (ids, options = {}) => {
+    const opts = { 
+      ...DEFAULTS, 
+      fillA: "#77ffcc",
+      fillB: "#6699bf",
+      ...options 
+    };
+    
+    ids.forEach((id, i) => {
+      const shape = getShape(id);
+      if (!shape) return;
+      
+      const isEven = i % 2 === 0;
+      
+      gsap.to(shape, {
+        fill: isEven ? opts.fillA : opts.fillB,
+        duration: opts.duration,
+        repeat: opts.repeat,
+        yoyo: opts.yoyo,
+        ease: opts.ease,
+        delay: i * opts.stagger
+      });
+    });
+    
+    return ids.length * opts.stagger + opts.duration;
+  };
+
+  /**
+   * PATTERN: Breathing (for Triple Goddess)
+   * Gentle opacity pulse - creates breathing effect
+   */
+  const breathing = (ids, options = {}) => {
+    const opts = {
+      opacityFrom: 0.7,
+      opacityTo: 1.0,
+      duration: 2.5,
+      stagger: 0.3,
+      ease: "sine.inOut",
+      ...options
+    };
+    
+    ids.forEach((id, i) => {
+      const element = document.getElementById(id);
+      if (!element) return;
+      
+      gsap.to(element, {
+        opacity: opts.opacityTo,
+        duration: opts.duration,
+        repeat: -1,
+        yoyo: true,
+        ease: opts.ease,
+        delay: i * opts.stagger
+      });
+    });
+    
+    return ids.length * opts.stagger + opts.duration;
+  };
+
+  /**
+   * PATTERN: Goddess Phases
+   * Triple goddess cycles through moon phases
+   * Waxing → Full → Waning
+   */
+  const goddessPhases = (options = {}) => {
+    const opts = {
+      duration: 3.0,
+      stagger: 1.0,
+      ease: "sine.inOut",
+      ...options
+    };
+    
+    const crescents = ['crescent-left', 'crescent-right', 'crescent-top'];
+    const full = 'full-circle';
+    const bindu = 'bindu';
+    
+    const tl = gsap.timeline({ repeat: -1 });
+    
+    // Waxing phase - left crescent brightens
+    tl.to(`#${crescents[0]}`, {
+      fill: "#99ceff",
+      opacity: 1,
+      duration: opts.duration,
+      ease: opts.ease
+    }, 0);
+    
+    // Full phase - center glows
+    tl.to(`#${full}`, {
+      fill: "#88b3dd",
+      duration: opts.duration,
+      ease: opts.ease
+    }, opts.stagger);
+    
+    // Waning phase - right crescent brightens  
+    tl.to(`#${crescents[1]}`, {
+      fill: "#99ceff",
+      opacity: 1,
+      duration: opts.duration,
+      ease: opts.ease
+    }, opts.stagger * 2);
+    
+    // Bindu pulse throughout
+    tl.to(`#${bindu}`, {
+      opacity: 0.5,
+      scale: 1.2,
+      duration: opts.duration * 0.5,
+      repeat: -1,
+      yoyo: true,
+      ease: "sine.inOut",
+      transformOrigin: "center center"
+    }, 0);
+    
+    return opts.duration * 3;
+  };
+
+  /**
+   * STOP all animations on given elements
+   */
+  const stop = (ids) => {
+    ids.forEach(id => {
+      const shape = getShape(id);
+      if (shape) gsap.killTweensOf(shape);
+    });
+  };
+
+  /**
+   * STOP all animations everywhere
+   */
+  const stopAll = () => {
+    gsap.killTweensOf("polygon, polyline, path, circle");
+  };
+
+  // Public API
+  return {
+    // Pattern functions
+    sequential,
+    radialBurst,
+    wave,
+    spiral,
+    randomSparkle,
+    pulseAll,
+    binary,
+    breathing,
+    goddessPhases,
+    
+    // Control functions
+    stop,
+    stopAll,
+    
+    // Helper
+    getShape,
+    
+    // Play pattern by name
+    playPattern: (patternName, ids, options = {}) => {
+      const patterns = {
+        sequential,
+        radialBurst,
+        wave,
+        spiral,
+        randomSparkle,
+        pulseAll,
+        binary,
+        breathing,
+        goddessPhases
+      };
+      
+      const pattern = patterns[patternName];
+      if (!pattern) {
+        console.warn(`Pattern "${patternName}" not found`);
+        return 0;
+      }
+      
+      return pattern(ids, options);
+    }
+  };
+})();
+
+console.log("🎨 Animation Patterns Library loaded");
