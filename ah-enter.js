@@ -310,7 +310,7 @@ document.addEventListener("DOMContentLoaded", () => {
       // Goddess scales down and moves down the screen
       // Calculate a controlled downward movement
       const vh = window.innerHeight;
-      const goddessDropDistance = vh * 0.15; // Move down 15% of viewport height
+      const goddessDropDistance = vh * 0.12; // Move down 12% of viewport height
       
       divinationTl.to(goddess, {
         y: `+=${goddessDropDistance}`, // Move down from current position
@@ -335,7 +335,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     
     // Small pause after goddess lands
-    divinationTl.to({}, { duration: 0.3 });
+    divinationTl.to({}, { duration: 2.3 });
 
     // ============================================================
     // STEP 2: METATRON GROWS & ROTATES (2.5s)
