@@ -391,7 +391,7 @@ document.addEventListener("DOMContentLoaded", () => {
         goddess,
         {
           y: "+=20vh",      // drop down from current position
-          scale: 0.3,       // shrink into dock size
+          scale: 0.5,       // shrink into dock size
           duration: 1.4,
           ease: "power2.inOut",
           onStart: () => console.log("🌙 Goddess dropping to dock"),
