@@ -82,7 +82,15 @@ document.addEventListener("DOMContentLoaded", () => {
   gsap.set(prompts, { autoAlpha: 0, scale: 0, visibility: "hidden" });
   gsap.set(shaderW,   { autoAlpha: 0, pointerEvents: "none" });
   gsap.set(audioUI,   { autoAlpha: 0, pointerEvents: "none" });
-  gsap.set(goddess,   { autoAlpha: 0, pointerEvents: "none" });
+  if (goddess) {
+  gsap.set(goddess, {
+    autoAlpha: 1,          // visible on enter
+    pointerEvents: "none", // not clickable yet
+    y: 0,                  // baseline transform
+    scale: 1,
+    transformOrigin: "50% 50%"
+  });
+}
   gsap.set([overlay, temple], { autoAlpha: 1 });
   gsap.set(metatron,  { transformOrigin: "50% 50%", force3D: true });
   
@@ -352,30 +360,21 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // 2) Goddess drops and parks at bottom
     if (goddess) {
-      // Ensure visible first
-      divinationTl.set(goddess, {
-        autoAlpha: 1,
-        pointerEvents: "none",
-        transformOrigin: "50% 50%"
-      }, "<");
-
-      // Start slightly above and drop down to parked position
-      divinationTl.fromTo(goddess,
-        { y: "-20vh", scale: 0.8 },
-        {
-          y: "15vh",          // dock depth
-          scale: 0.3,
-          duration: 1.4,
-          ease: "power2.inOut",
-          onStart: () => console.log("🌙 Goddess dropping to dock"),
-          onComplete: () => {
-            console.log("✅ Goddess docked");
-            gsap.set(goddess, { pointerEvents: "auto" });
-          }
-        },
-        "<" // start with title fade
-      );
-    }
+  divinationTl.to(goddess,
+    {
+      y: "+=20vh",        // drop down from current position
+      scale: 0.3,         // shrink into dock size
+      duration: 1.4,
+      ease: "power2.inOut",
+      onStart: () => console.log("🌙 Goddess dropping to dock"),
+      onComplete: () => {
+        console.log("✅ Goddess docked");
+        gsap.set(goddess, { pointerEvents: "auto" }); // now usable as nav glyph
+      }
+    },
+    "<" // overlap with title fade
+  );
+}
 
     // 3) Metatron shrinks to center while shader fades
     if (metatron) {
@@ -533,4 +532,4 @@ document.addEventListener("DOMContentLoaded", () => {
     
     console.log("🔍 Navigation toggle (not yet implemented)");
   });
-});
+});// JavaScript Document
