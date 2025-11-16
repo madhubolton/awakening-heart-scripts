@@ -1,25 +1,30 @@
 /*--------------------------------------------------------------
   Awakening Heart : Oracle Opening Sequence
-  Version: 10.2.0 | 2025-11-16
+  Version: 10.2.1 | 2025-11-16
   
-  SIMPLIFIED FLOW
+  FLOW
 
-  1) ENTRY CLICK (overlay / screen)
+  1) Title + prompt carousel plays with overlay.
+     - Goddess NOT visible yet.
+
+  2) ENTRY CLICK (overlay / general enter)
      - Overlay fades, temple dissolves, Metatron scales up
-     - Shader reveals, audio starts
+     - Shader reveals
+     - Audio starts
+     - Goddess becomes visible in original glyph position
      - Facet animation starts and loops continuously
      - Metatron center becomes clickable (pulsing)
 
-  2) CENTER CLICK (P_C)
+  3) CENTER CLICK (P_C)
      - Stop facet loop
-     - Goddess drops & parks at bottom (navigation element)
+     - Goddess drops + scales down and parks at bottom
      - Metatron shrinks and spins into the center, shader fades
      - Navigate to CMS scene
 
 --------------------------------------------------------------*/
 
 document.addEventListener("DOMContentLoaded", () => {
-  console.log("💖 Awakening Heart : Oracle Opening initialized (v10.2.0)");
+  console.log("💖 Awakening Heart : Oracle Opening initialized (v10.2.1)");
 
   // ------- Core DOM -------
   const overlay   = document.getElementById("oracleOverlay") || document.getElementById("overlay");
@@ -33,12 +38,12 @@ document.addEventListener("DOMContentLoaded", () => {
   
   // Audio toggle button with icon
   const audioToggle = document.getElementById("audioToggle");
-  const icon = audioToggle?.querySelector('svg') || audioToggle?.querySelector('.icon-On');
+  const icon = audioToggle?.querySelector("svg") || audioToggle?.querySelector(".icon-On");
 
   // Get oracle scene audio URL with fallback
-  const oracleAudioUrl = bg?.getAttribute('data-scene-audio') || bg?.src;
+  const oracleAudioUrl = bg?.getAttribute("data-scene-audio") || bg?.src;
 
-  // Prompts
+  // Prompt elements (intro text)
   const prompts = [
     document.getElementById("prompt0"), // Welcome
     document.getElementById("prompt1"),
@@ -65,8 +70,8 @@ document.addEventListener("DOMContentLoaded", () => {
   // ------- IMMEDIATE HIDE to prevent flicker -------
   prompts.forEach(p => {
     if (p) {
-      p.style.visibility = 'hidden';
-      p.style.opacity = '0';
+      p.style.visibility = "hidden";
+      p.style.opacity = "0";
     }
   });
 
@@ -75,26 +80,29 @@ document.addEventListener("DOMContentLoaded", () => {
   let sequenceStarted    = false;   // has enterSequence run
   let divinationStarted  = false;   // has center-click sequence started
   let facetLoopActive    = false;   // is facet loop currently running
-  let facetLoopTl        = null;    // GSAP timeline (if AHPatterns returns one)
+  let facetLoopTl        = null;    // GSAP timeline for facets
 
   // ------- Initial states -------
   gsap.set([title], { autoAlpha: 0, clearProps: "transform" });
   gsap.set(prompts, { autoAlpha: 0, scale: 0, visibility: "hidden" });
   gsap.set(shaderW,   { autoAlpha: 0, pointerEvents: "none" });
   gsap.set(audioUI,   { autoAlpha: 0, pointerEvents: "none" });
+  
+  // Goddess is NOT visible until general enter click
   if (goddess) {
-  gsap.set(goddess, {
-    autoAlpha: 1,          // visible on enter
-    pointerEvents: "none", // not clickable yet
-    y: 0,                  // baseline transform
-    scale: 1,
-    transformOrigin: "50% 50%"
-  });
-}
+    gsap.set(goddess, {
+      autoAlpha: 0,
+      pointerEvents: "none",
+      y: 0,
+      scale: 1,
+      transformOrigin: "50% 50%"
+    });
+  }
+
   gsap.set([overlay, temple], { autoAlpha: 1 });
   gsap.set(metatron,  { transformOrigin: "50% 50%", force3D: true });
   
-  // Set icon to dark/off state initially
+  // Icon: dark/off state initially
   if (icon) gsap.set(icon, { opacity: 0.4 });
   
   if (bg) { 
@@ -142,7 +150,7 @@ document.addEventListener("DOMContentLoaded", () => {
     console.log("✨ Starting continuous facet loop");
 
     if (window.AHPatterns && typeof window.AHPatterns.sequential === "function") {
-      // Ask AHPatterns to give us a looping sequence if possible
+      // Ask AHPatterns to give us a looping sequence
       facetLoopTl = window.AHPatterns.sequential(facetIds, {
         fill: "#77ffcc",
         duration: 1.4,
@@ -175,7 +183,6 @@ document.addEventListener("DOMContentLoaded", () => {
       facetLoopTl.kill();
     }
 
-    // Kill any straggler facet tweens just in case
     const allFacets = document.querySelectorAll('[id^="F_"]');
     gsap.killTweensOf(allFacets);
 
@@ -260,9 +267,29 @@ document.addEventListener("DOMContentLoaded", () => {
     // Dissolve temple (with 0.5 sec delay)
     if (temple) clickTl.to(temple, { autoAlpha: 0, duration: 0.9 }, ">+0.5");
 
-    // Scale Metatron 20→30vw
+    // Scale Metatron up
     if (metatron) {
-      clickTl.fromTo(metatron, { scale: 1 }, { scale: 1.25, duration: 1.2 }, ">-0.7");
+      clickTl.fromTo(
+        metatron, 
+        { scale: 1 }, 
+        { scale: 1.25, duration: 1.2 }, 
+        ">-0.7"
+      );
+    }
+
+    // Reveal Goddess in original glyph position AFTER entry click
+    if (goddess) {
+      clickTl.set(
+        goddess,
+        {
+          autoAlpha: 1,
+          pointerEvents: "none", // not clickable yet
+          y: 0,
+          scale: 1,
+          transformOrigin: "50% 50%"
+        },
+        ">-0.4" // slight overlap with Metatron zoom
+      );
     }
 
     // 🎵 Audio fade up - Start oracle scene audio
@@ -323,12 +350,12 @@ document.addEventListener("DOMContentLoaded", () => {
     }, ">");
   }
 
-  // ------- SIMPLIFIED DIVINATION SEQUENCE (center click) -------
+  // ------- DIVINATION SEQUENCE (center click) -------
   async function divinationSequence() {
     if (divinationStarted) return;
     divinationStarted = true;
 
-    console.log("🎯 Metatron center clicked - Beginning simplified divination sequence");
+    console.log("🎯 Metatron center clicked - Beginning divination sequence");
 
     const metatronCenter = document.getElementById("P_C");
     if (metatronCenter) {
@@ -343,7 +370,7 @@ document.addEventListener("DOMContentLoaded", () => {
       defaults: { ease: "sine.inOut" },
       onComplete: () => {
         console.log("🌀 Divination sequence complete - Navigating to scene");
-        // Navigate to CMS scene
+        // TODO: update URL as needed or make dynamic
         window.location.href = "https://awakening-heart.webflow.io/scenes/surrender-01";
       }
     });
@@ -358,23 +385,24 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     }
 
-    // 2) Goddess drops and parks at bottom
+    // 2) Goddess drops + scales down and parks at bottom (relative move)
     if (goddess) {
-  divinationTl.to(goddess,
-    {
-      y: "+=20vh",        // drop down from current position
-      scale: 0.3,         // shrink into dock size
-      duration: 1.4,
-      ease: "power2.inOut",
-      onStart: () => console.log("🌙 Goddess dropping to dock"),
-      onComplete: () => {
-        console.log("✅ Goddess docked");
-        gsap.set(goddess, { pointerEvents: "auto" }); // now usable as nav glyph
-      }
-    },
-    "<" // overlap with title fade
-  );
-}
+      divinationTl.to(
+        goddess,
+        {
+          y: "+=20vh",      // drop down from current position
+          scale: 0.3,       // shrink into dock size
+          duration: 1.4,
+          ease: "power2.inOut",
+          onStart: () => console.log("🌙 Goddess dropping to dock"),
+          onComplete: () => {
+            console.log("✅ Goddess docked");
+            gsap.set(goddess, { pointerEvents: "auto" }); // now usable as nav glyph
+          }
+        },
+        "<" // overlap with title fade
+      );
+    }
 
     // 3) Metatron shrinks to center while shader fades
     if (metatron) {
@@ -403,12 +431,12 @@ document.addEventListener("DOMContentLoaded", () => {
         onComplete: () => {
           console.log("✅ Metatron shrunk to center");
         }
-      }, "-=0.4"); // overlap slightly with goddess drop
+      }, "-=0.4");
     }
 
     // 4) Fade out inner Metatron shapes a bit after shrink starts
     divinationTl.add(() => {
-      const allShapes = document.querySelectorAll('#metatron polygon, #metatron polyline');
+      const allShapes = document.querySelectorAll("#metatron polygon, #metatron polyline");
       gsap.to(allShapes, {
         opacity: 0,
         duration: 2.0,
@@ -471,7 +499,7 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     });
     
-    // CLICK triggers simplified divination sequence
+    // CLICK triggers divination sequence
     metatronCenter.addEventListener("click", (e) => {
       e.stopPropagation();
       divinationSequence();
@@ -480,16 +508,20 @@ document.addEventListener("DOMContentLoaded", () => {
     console.log("🎯 Metatron center now clickable - click to begin divination");
   }
 
-  // ------- Click Handler for Entry -------
+  // ------- Click Handler for Entry (general enter) -------
   document.addEventListener("click", (e) => {
     if (!readyForClick) return;
+
+    // Ignore clicks on UI elements
     if (audioUI && audioUI.contains(e.target)) return;
     if (goddess && goddess.contains(e.target)) return;
+
     enterSequence();
   });
 
   // ------- Audio Toggle Control (Persistent) -------
-  audioToggle?.addEventListener("click", async () => {
+  audioToggle?.addEventListener("click", async (e) => {
+    e.stopPropagation();
     if (!bg) return;
     
     if (window.AHAudioState) {
@@ -506,8 +538,8 @@ document.addEventListener("DOMContentLoaded", () => {
           if (bg.paused) await bg.play();
           gsap.to(bg, { volume: 0.35, duration: 0.3 });
           if (icon) gsap.to(icon, { opacity: 1, duration: 0.3 });
-        } catch (e) {
-          console.warn("Audio play failed:", e);
+        } catch (err) {
+          console.warn("Audio play failed:", err);
         }
       }
     }
@@ -530,6 +562,6 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     }
     
-    console.log("🔍 Navigation toggle (not yet implemented)");
+    console.log("🔍 Navigation toggle (behavior to be implemented)");
   });
-});// JavaScript Document
+});
