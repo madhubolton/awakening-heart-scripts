@@ -310,7 +310,7 @@ document.addEventListener("DOMContentLoaded", () => {
       // Goddess scales down and moves down the screen
       // Calculate a controlled downward movement
       const vh = window.innerHeight;
-      const goddessDropDistance = vh * 0.12; // Move down 12% of viewport height
+      const goddessDropDistance = vh * 0.10; // Move down 10% of viewport height
       
       divinationTl.to(goddess, {
         y: `+=${goddessDropDistance}`, // Move down from current position
@@ -348,7 +348,7 @@ document.addEventListener("DOMContentLoaded", () => {
       // Lazy spin and scale UP dramatically (from 1.25 to 2.0 = 160% increase)
       divinationTl.to(metatron, {
         rotation: 360,
-        scale: 2.0,  // Much more pronounced growth!
+        scale: 3.0,  // Much more pronounced growth!
         duration: 2.5,
         ease: "power1.inOut",
         transformOrigin: "50% 50%"
@@ -361,7 +361,7 @@ document.addEventListener("DOMContentLoaded", () => {
         autoAlpha: 0,
         duration: 1.0,
         ease: "power2.in"
-      }, growLabel + "+=0.5");
+      }, growLabel + "+=0.75");
     }
     
     // Goddess dissolves DURING the grow (starts 0.5s into the grow)
@@ -370,7 +370,7 @@ document.addEventListener("DOMContentLoaded", () => {
         autoAlpha: 0,
         duration: 1.0,
         ease: "power2.in"
-      }, growLabel + "+=0.5");
+      }, growLabel + "+=0.75");
     }
 
     // ============================================================
@@ -390,7 +390,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     
     // Significant pause at stillness (1 second)
-    divinationTl.to({}, { duration: 1.0 });
+    divinationTl.to({}, { duration: 10.0 });
 
     // ============================================================
     // STEP 4: FACET ANIMATION (3-4s)
