@@ -1,41 +1,39 @@
 /*--------------------------------------------------------------
   Awakening Heart : Oracle Opening Sequence
-  Version: 9.2.0 | 2025-11-15
+  Version: 10.0.0 | 2025-11-16
+  
+  SIMPLIFIED DIVINATION SEQUENCE
   
   TRIGGER POINTS:
-  1. Click to enter (after prompts) â†’ Entry behavior (unchanged)
+  1. Click to enter (after prompts) → Entry behavior (unchanged)
      - Overlay fades, temple dissolves, Metatron scales up
      - Shader reveals, audio starts, goddess appears
      - Metatron center becomes clickable
   
-  2. Click Metatron center (P_C) â†’ REFINED DIVINATION SEQUENCE
-     Step 1: Goddess descends (1.7s + pause)
-             - Scales to 0.7 AND moves down screen
-     Step 2: Metatron grows & rotates (2.5s)
-             - Dramatic growth to 2.0x scale
-             - Title & goddess dissolve during this
-     Step 3: Rotation stops (1.3s total)
-             - Settles at peak size
-             - Significant 1s pause
-     Step 4: Facets animate (5s - watch for several seconds)
-             - Sequential pattern builds
-             - Extended contemplation time
-     Step 5: Dissolution (2.5s - rotate & shrink)
-             - Shader dissolves early (1.5s)
-             - Metatron shrinks to void
-     Step 6: Void (0.5s hold)
-     Total: ~13 seconds
+  2. Click Metatron center (P_C) → SIMPLIFIED DIVINATION SEQUENCE
+     Step 1: Goddess docks at bottom (1.2s)
+             - Shrinks to 0.3 scale and moves to bottom
+             - Remains visible throughout transition
+     Step 2: Facet animation plays (5s)
+             - Sequential pattern for contemplation
+     Step 3: Title dissolves (1s)
+             - Fades out during facets
+     Step 4: Metatron shrinks to center (3s)
+             - Rotates and shrinks to near-zero
+             - Shader dissolves when Metatron ~30%
+     
+     Final state: Only Triple Goddess visible at bottom
+     Total: ~10.7 seconds
   
-  Updates from v9.1.0:
-  - Goddess now moves down (15% vh) in addition to scaling
-  - Metatron scale increased to 2.0 (more dramatic)
-  - Pause at peak increased to 1.0s (more significant)
-  - Facet display time increased to 5.0s total
-  - Shader dissolves early (before Metatron reaches 20%)
+  Updates from v9.2.0:
+  - Simplified from 6 steps to 4 steps
+  - Goddess remains visible (docks at bottom)
+  - Removed growth phase for Metatron
+  - More straightforward sequencing
 --------------------------------------------------------------*/
 
 document.addEventListener("DOMContentLoaded", () => {
-  console.log("ðŸ’– Awakening Heart : Oracle Opening initialized (v9.2.0)");
+  console.log("💖 Awakening Heart : Oracle Opening initialized (v10.0.0)");
 
   // ------- Core DOM -------
   const overlay   = document.getElementById("oracleOverlay") || document.getElementById("overlay");
@@ -63,7 +61,7 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("prompt4")  // "You may enter. Click when ready."
   ].filter(Boolean);
 
-  console.log("ðŸ§© Elements found:", { 
+  console.log("🧩 Elements found:", { 
     overlay: !!overlay,
     temple: !!temple,
     title: !!title,
@@ -107,7 +105,7 @@ document.addEventListener("DOMContentLoaded", () => {
     bg.volume = 0; 
     bg.muted = false;
     if (oracleAudioUrl && bg.src !== oracleAudioUrl) {
-      console.log("ðŸ”„ Setting audio source:", oracleAudioUrl);
+      console.log("🔄 Setting audio source:", oracleAudioUrl);
       bg.src = oracleAudioUrl;
     }
   }
@@ -127,9 +125,9 @@ document.addEventListener("DOMContentLoaded", () => {
   // ------- Opening timeline -------
   const tl = gsap.timeline({
     defaults: { ease: "sine.inOut" },
-    onStart: () => console.log("ðŸŽ¬ Oracle opening sequence started"),
+    onStart: () => console.log("🎬 Oracle opening sequence started"),
     onComplete: () => {
-      console.log("âœ¨ Oracle intro complete â€“ ready for entry");
+      console.log("✨ Oracle intro complete – ready for entry");
       readyForClick = true;
       gsap.set(document.documentElement, { cursor: "pointer" });
       if (overlay) gsap.set(overlay, { cursor: "pointer" });
@@ -141,7 +139,7 @@ document.addEventListener("DOMContentLoaded", () => {
     .to(title, { color: "hsl(268, 30%, 85%)", duration: 0.5 }, "<")
     .to(title, { color: "hsl(268, 50%, 60%)", duration: 0.75 });
 
-  // 2) Prompt carousel â€“ "breathe" out from center and back in
+  // 2) Prompt carousel – "breathe" out from center and back in
   prompts.forEach((p, idx) => {
     if (!p) return;
     
@@ -183,7 +181,7 @@ document.addEventListener("DOMContentLoaded", () => {
   async function enterSequence() {
     if (sequenceStarted || !readyForClick) return;
     sequenceStarted = true;
-    console.log("ðŸšª Oracle entered");
+    console.log("🚪 Oracle entered");
 
     gsap.set(document.documentElement, { cursor: "default" });
 
@@ -202,27 +200,27 @@ document.addEventListener("DOMContentLoaded", () => {
     // Dissolve temple (with 0.5 sec delay)
     if (temple) clickTl.to(temple, { autoAlpha: 0, duration: 0.9 }, ">+0.5");
 
-    // Scale Metatron 20â†’30vw
+    // Scale Metatron 20→30vw
     if (metatron) {
       clickTl.fromTo(metatron, { scale: 1 }, { scale: 1.25, duration: 1.2 }, ">-0.7");
     }
 
-    // ðŸŽµ Audio fade up - Start oracle scene audio
+    // 🎵 Audio fade up - Start oracle scene audio
     clickTl.add(async () => {
       if (!bg) {
-        console.error("âŒ No audio element found");
+        console.error("❌ No audio element found");
         return;
       }
       
       const volumeLevel = window.AHAudioState?.VOLUME_LEVEL || 0.35;
       
       if (oracleAudioUrl && bg.src !== oracleAudioUrl) {
-        console.log("ðŸ”„ Re-setting audio source:", oracleAudioUrl);
+        console.log("🔄 Re-setting audio source:", oracleAudioUrl);
         bg.src = oracleAudioUrl;
         await new Promise(resolve => setTimeout(resolve, 200));
       }
       
-      console.log("ðŸŽµ Attempting to play audio");
+      console.log("🎵 Attempting to play audio");
       
       try {
         bg.currentTime = 0;
@@ -230,7 +228,7 @@ document.addEventListener("DOMContentLoaded", () => {
         bg.muted = false;
         
         await bg.play();
-        console.log("âœ… Audio play succeeded");
+        console.log("✅ Audio play succeeded");
         
         gsap.to(bg, { volume: volumeLevel, duration: 1.0 });
         
@@ -240,9 +238,9 @@ document.addEventListener("DOMContentLoaded", () => {
         
         if (icon) gsap.to(icon, { opacity: 1, duration: 0.4 });
         
-        console.log("ðŸŽµ Oracle audio started");
+        console.log("🎵 Oracle audio started");
       } catch (e) {
-        console.error("âŒ Audio play failed:", e.message);
+        console.error("❌ Audio play failed:", e.message);
         if (window.AHAudioState) window.AHAudioState.setState(false);
         if (icon) gsap.set(icon, { opacity: 0.4 });
       }
@@ -257,7 +255,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
 
-    // ðŸŒ™ REVEAL TRIPLE GODDESS (Navigation Element)
+    // 🌙 REVEAL TRIPLE GODDESS (Navigation Element)
     if (goddess) {
       clickTl.to(goddess, {
         autoAlpha: 1,
@@ -268,20 +266,20 @@ document.addEventListener("DOMContentLoaded", () => {
         },
         onComplete: () => {
           gsap.set(goddess, { pointerEvents: "auto" });
-          console.log("ðŸŒ™ Triple Goddess navigation revealed");
+          console.log("🌙 Triple Goddess navigation revealed");
         }
       }, ">-0.3");
     }
     
-    // ðŸŽ¯ ENABLE METATRON CENTER CLICK for refined divination sequence
+    // 🎯 ENABLE METATRON CENTER CLICK for refined divination sequence
     clickTl.add(() => {
       enableMetatronNavigation();
     }, ">");
   }
 
-  // ------- REFINED DIVINATION SEQUENCE (triggered by Metatron center click) -------
+  // ------- SIMPLIFIED DIVINATION SEQUENCE (triggered by Metatron center click) -------
   async function divinationSequence() {
-    console.log("ðŸŽ¯ Metatron center clicked - Beginning refined divination sequence");
+    console.log("🎯 Metatron center clicked - Beginning simplified divination sequence");
     
     // Disable further clicks during sequence
     const metatronCenter = document.getElementById("P_C");
@@ -292,7 +290,7 @@ document.addEventListener("DOMContentLoaded", () => {
     
     // CRITICAL: Stop any existing animations on Metatron
     if (metatron) {
-      console.log("ðŸ›‘ Killing existing Metatron animations");
+      console.log("🛑 Killing existing Metatron animations");
       gsap.killTweensOf(metatron);
       gsap.killTweensOf("#metatron");
       gsap.killTweensOf("#metatron *"); // Kill child animations too
@@ -300,157 +298,66 @@ document.addEventListener("DOMContentLoaded", () => {
       // Stop metatron animation engine if running
       if (window.metatron && window.metatron.stopAll) {
         window.metatron.stopAll();
-        console.log("ðŸ›‘ Stopped metatron engine animations");
+        console.log("🛑 Stopped metatron engine animations");
       }
     }
 
-    // ------- THE REFINED SEQUENCE (REVISED) -------
+    // ------- THE SIMPLIFIED SEQUENCE -------
     const divinationTl = gsap.timeline({ 
       defaults: { ease: "sine.inOut" },
       onComplete: () => {
-        console.log("ðŸŒ€ Divination sequence complete - Navigating to scene");
+        console.log("🌀 Divination sequence complete - Navigating to scene");
         // Navigate to CMS scene
         window.location.href = "https://awakening-heart.webflow.io/scenes/surrender-01";
       }
     });
 
     // ============================================================
-    // STEP 1: GODDESS DESCENDS (1.2s)
-    // Goddess scales down and moves to bottom
+    // STEP 1: GODDESS DOCKS AT BOTTOM (1.2s)
+    // Goddess shrinks and moves to dock at bottom of screen
+    // She remains visible throughout for continuity
     // ============================================================
-    const goddessLabel = divinationTl.addLabel("goddessDescend");
+    const goddessLabel = divinationTl.addLabel("goddessDock");
     
     if (goddess) {
-      // Goddess scales down and moves down the screen
-      // Calculate a controlled downward movement
+      // Calculate docking position at bottom of viewport
       const vh = window.innerHeight;
-      const goddessDropDistance = vh * 0.15; // Move down 15% of viewport height
+      const vw = window.innerWidth;
+      
+      // Move goddess to bottom - about 5% from bottom edge
+      // Use absolute positioning for precise docking
+      const dockY = vh * 0.45; // Move down 45% of viewport height
+      const dockScale = 0.3; // Small but visible size
       
       divinationTl.to(goddess, {
-        y: `+=${goddessDropDistance}`, // Move down from current position
-        scale: 0.7,
+        y: dockY, // Absolute position from current
+        scale: dockScale,
         duration: 1.2,
         ease: "power2.inOut",
-        transformOrigin: "50% 50%"
-      }, goddessLabel);
-      
-      // Micro-bounce - very subtle settle (scale compression)
-      divinationTl.to(goddess, {
-        scale: 0.68, // Tiny compression
-        duration: 0.2,
-        ease: "power1.out"
-      }, goddessLabel + "+=1.2");
-      
-      divinationTl.to(goddess, {
-        scale: 0.7, // Back to target
-        duration: 0.2,
-        ease: "power1.in"
-      }, goddessLabel + "+=1.4");
-    }
-    
-    // Small pause after goddess lands
-    divinationTl.to({}, { duration: 0.3 });
-
-    // ============================================================
-    // STEP 2: METATRON GROWS & ROTATES (2.5s)
-    // Lazy rotation begins, grows to dramatic size
-    // Title and Goddess dissolve WHILE this happens
-    // ============================================================
-    const growLabel = divinationTl.addLabel("metatronGrow");
-    
-    if (metatron) {
-      console.log("ðŸŽ¯ Starting Metatron grow");
-      console.log("   Current scale:", gsap.getProperty(metatron, "scale"));
-      console.log("   Current rotation:", gsap.getProperty(metatron, "rotation"));
-      
-      // Use fromTo for explicit control - specify starting state
-      divinationTl.fromTo(metatron, 
-        {
-          // Starting state (should be from entry)
-          rotation: 0,
-          scale: 1.25
+        transformOrigin: "50% 50%",
+        onStart: () => {
+          console.log("🌙 Goddess docking at bottom");
         },
-        {
-          // End state
-          rotation: 360,
-          scale: 4.0,  // Very dramatic for testing
-          duration: 2.5,
-          ease: "power1.inOut",
-          transformOrigin: "50% 50%",
-          force3D: true,
-          onStart: () => {
-            console.log("ðŸŒ€ Metatron grow animation STARTED");
-          },
-          onUpdate: function() {
-            if (this.progress() === 0 || this.progress() === 0.5 || this.progress() === 1) {
-              console.log(`ðŸ“Š Progress: ${Math.round(this.progress() * 100)}% - Scale: ${gsap.getProperty(metatron, "scale").toFixed(2)}`);
-            }
-          },
-          onComplete: () => {
-            console.log("âœ… Metatron grow COMPLETE");
-            console.log("   Final scale:", gsap.getProperty(metatron, "scale"));
-          }
-        }, 
-        growLabel
-      );
-    } else {
-      console.error("âŒ Metatron element not found!");
-    }
-    
-    // Title dissolves DURING the grow (starts 0.5s into the grow)
-    if (title) {
-      divinationTl.to(title, {
-        autoAlpha: 0,
-        duration: 1.0,
-        ease: "power2.in"
-      }, growLabel + "+=0.5");
-    }
-    
-    // Goddess dissolves DURING the grow (starts 0.5s into the grow)
-    if (goddess) {
-      divinationTl.to(goddess, {
-        autoAlpha: 0,
-        duration: 1.0,
-        ease: "power2.in"
-      }, growLabel + "+=0.5");
-    }
-
-    // ============================================================
-    // STEP 3: ROTATION STOPS (0.3s)
-    // Metatron reaches peak size, rotation stops
-    // ============================================================
-    const stopLabel = divinationTl.addLabel("rotationStop", "metatronGrow+=2.5");
-    
-    if (metatron) {
-      console.log("ðŸ›‘ Stopping rotation at peak scale");
-      
-      // Lock in final dramatic scale (match Step 2's target: 4.0)
-      divinationTl.to(metatron, {
-        scale: 4.0,  // Match the scale from Step 2!
-        // Don't animate rotation - let it stay at 360Â°
-        duration: 0.3,
-        ease: "power2.out",
         onComplete: () => {
-          console.log("â¸ï¸ Rotation stopped - Scale locked at:", gsap.getProperty(metatron, "scale"));
+          console.log("✅ Goddess docked - remains visible");
+          // Ensure goddess stays visible (don't dissolve)
+          gsap.set(goddess, { autoAlpha: 1 });
         }
-      }, stopLabel);
+      }, goddessLabel);
     }
     
-    // Significant pause at stillness (1 second)
-    divinationTl.to({}, { 
-      duration: 1.0,
-      onStart: () => console.log("â³ Pause at peak - 1 second stillness")
-    });
+    // Small pause after goddess docks
+    divinationTl.to({}, { duration: 0.5 });
 
     // ============================================================
-    // STEP 4: FACET ANIMATION (3-4s)
-    // Facets animate, we watch for several seconds
+    // STEP 2: FACET ANIMATION SEQUENCE (5s)
+    // Play the facet animation for contemplation
     // ============================================================
     const facetsLabel = divinationTl.addLabel("facets");
     
-    // FACETS ANIMATE
+    // Start facets animation
     divinationTl.add(() => {
-      console.log("âœ¨ Facets display beginning");
+      console.log("✨ Starting facet animation sequence");
       
       if (window.AHPatterns) {
         const facetIds = [
@@ -467,80 +374,128 @@ document.addEventListener("DOMContentLoaded", () => {
           "F_I_OCT_TL", "F_I_BG_TL"
         ];
         
-        // Slower, more contemplative pattern
+        // Contemplative sequential pattern
         window.AHPatterns.sequential(facetIds, {
           fill: "#77ffcc",
-          duration: 1.2,
-          stagger: 0.08, // Slower stagger
+          duration: 1.5,
+          stagger: 0.12, // Slower, more deliberate
           repeat: 0,
           yoyo: false,
-          ease: "sine.inOut"
+          ease: "power2.inOut"
+        });
+      } else {
+        console.warn("⚠️ AHPatterns not available - using fallback");
+        // Fallback: Simple fade of all facets
+        const allFacets = document.querySelectorAll('[id^="F_"]');
+        gsap.to(allFacets, {
+          fill: "#77ffcc",
+          duration: 2,
+          stagger: 0.1,
+          ease: "power2.inOut"
         });
       }
     }, facetsLabel);
     
-    // Hold to watch the facet animation complete and linger
-    // 24 facets * 0.08 stagger = ~2s for sequence + 1.2s duration + 2s hold = ~5s total
-    divinationTl.to({}, { duration: 5.0 }, facetsLabel);
+    // Hold for full facet sequence (5 seconds total)
+    divinationTl.to({}, { 
+      duration: 5.0,
+      onStart: () => console.log("⏳ Watching facet animation (5s)"),
+      onComplete: () => console.log("✅ Facet sequence complete")
+    }, facetsLabel);
 
     // ============================================================
-    // STEP 5: DISSOLUTION (2.5s)
-    // Metatron rotates again and shrinks to center
-    // Shader dissolves EARLY (before Metatron reaches 20%)
+    // STEP 3: TITLE DISSOLVES (1s)
+    // Title fades out during/after facets
     // ============================================================
-    const dissolveLabel = divinationTl.addLabel("dissolution");
+    const titleLabel = divinationTl.addLabel("titleDissolve", "facets+=3.5");
     
-    // Shader dissolves early in the sequence
-    if (shaderW) {
-      divinationTl.to(shaderW, {
+    if (title) {
+      divinationTl.to(title, {
         autoAlpha: 0,
-        duration: 1.5,
-        ease: "power2.in"
-      }, dissolveLabel);
+        duration: 1.0,
+        ease: "power2.in",
+        onStart: () => console.log("📝 Title dissolving"),
+        onComplete: () => console.log("✅ Title dissolved")
+      }, titleLabel);
     }
+
+    // ============================================================
+    // STEP 4: METATRON SHRINKS TO CENTER (3s)
+    // Metatron rotates and shrinks to center
+    // Shader dissolves when Metatron reaches ~30% scale
+    // ============================================================
+    const shrinkLabel = divinationTl.addLabel("metatronShrink", "facets+=5");
     
     if (metatron) {
-      console.log("ðŸŒŠ Starting dissolution from scale:", gsap.getProperty(metatron, "scale"));
+      console.log("🌀 Starting Metatron shrink and rotation");
+      console.log("   Current scale:", gsap.getProperty(metatron, "scale"));
       
-      // Rotate and shrink to void (from 4.0 to 0.01)
+      // Get current state (should be 1.25 from entry)
+      const currentScale = gsap.getProperty(metatron, "scale") || 1.25;
+      
+      // Rotate and shrink to near-zero
       divinationTl.to(metatron, {
-        scale: 0.01,
-        rotation: "+=180", // Gentle rotation (360Â° â†’ 540Â°)
-        duration: 2.5,
+        scale: 0.01, // Shrink to almost nothing
+        rotation: "+=720", // Two full rotations for drama
+        duration: 3.0,
         ease: "power2.in",
         transformOrigin: "50% 50%",
+        force3D: true,
+        onStart: () => {
+          console.log("🌀 Metatron shrinking from scale:", currentScale);
+        },
+        onUpdate: function() {
+          const currentScale = gsap.getProperty(metatron, "scale");
+          
+          // When Metatron reaches 30% of starting scale, dissolve shader
+          if (currentScale <= (1.25 * 0.3) && shaderW && gsap.getProperty(shaderW, "opacity") > 0) {
+            console.log("💫 Triggering shader dissolve at scale:", currentScale);
+            gsap.to(shaderW, {
+              autoAlpha: 0,
+              duration: 1.5,
+              ease: "power2.in",
+              overwrite: true
+            });
+          }
+        },
         onComplete: () => {
-          console.log("ðŸŒ€ Dissolution complete - at void scale:", gsap.getProperty(metatron, "scale"));
+          console.log("✅ Metatron shrunk to center");
+          console.log("   Final scale:", gsap.getProperty(metatron, "scale"));
         }
-      }, dissolveLabel);
+      }, shrinkLabel);
     }
     
-    // Fade out facets during dissolution
+    // Fade out facet colors during shrink
     divinationTl.add(() => {
       const allShapes = document.querySelectorAll('#metatron polygon, #metatron polyline');
       gsap.to(allShapes, {
         opacity: 0,
-        duration: 1.8,
+        duration: 2.0,
         ease: "power2.in"
       });
-    }, dissolveLabel + "+=0.5");
+    }, shrinkLabel + "+=0.5");
 
     // ============================================================
-    // STEP 6: THE VOID (0.5s)
-    // Brief hold at void before navigation
+    // FINAL STATE: Only Triple Goddess visible
+    // Brief hold before navigation
     // ============================================================
-    const voidLabel = divinationTl.addLabel("void");
+    divinationTl.to({}, { 
+      duration: 0.5,
+      onStart: () => {
+        console.log("🌙 Final state - Only Triple Goddess visible");
+        console.log("   Goddess scale:", goddess ? gsap.getProperty(goddess, "scale") : "N/A");
+        console.log("   Metatron scale:", metatron ? gsap.getProperty(metatron, "scale") : "N/A");
+      }
+    });
     
-    divinationTl.to({}, { duration: 0.5 }, voidLabel);
-    
-    console.log("ðŸŒ€ Entering void - preparing for scene transition");
+    console.log("🎬 Divination sequence started - Total duration: ~10.7s");
   }
 
   // ------- Enable Metatron Center Navigation -------
   function enableMetatronNavigation() {
     const metatronCenter = document.getElementById("P_C");
     if (!metatronCenter) {
-      console.warn("âš ï¸ Metatron center (P_C) not found");
+      console.warn("⚠️ Metatron center (P_C) not found");
       return;
     }
     
@@ -582,13 +537,13 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     });
     
-    // CLICK triggers refined divination sequence
+    // CLICK triggers simplified divination sequence
     metatronCenter.addEventListener("click", (e) => {
       e.stopPropagation();
-      divinationSequence(); // Trigger the refined 5-step sequence
+      divinationSequence(); // Trigger the simplified 4-step sequence
     });
     
-    console.log("ðŸŽ¯ Metatron center now clickable - click to begin divination");
+    console.log("🎯 Metatron center now clickable - click to begin divination");
   }
 
   // ------- Click Handler for Entry -------
@@ -606,7 +561,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (window.AHAudioState) {
       await window.AHAudioState.toggle(bg, icon);
     } else {
-      console.warn("âš ï¸ AHAudioState not found, using local toggle");
+      console.warn("⚠️ AHAudioState not found, using local toggle");
       const isPlaying = !bg.paused;
       
       if (isPlaying) {
@@ -627,7 +582,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // ------- Triple Goddess Navigation Toggle -------
   goddess?.addEventListener("click", (e) => {
     e.stopPropagation();
-    console.log("ðŸŒ™ Goddess navigation toggle clicked");
+    console.log("🌙 Goddess navigation toggle clicked");
     
     const fullCircle = document.querySelector("#triple-goddess #full-circle");
     if (fullCircle) {
@@ -641,6 +596,6 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     }
     
-    console.log("ðŸ“ Navigation toggle (not yet implemented)");
+    console.log("🔍 Navigation toggle (not yet implemented)");
   });
 });
