@@ -1,8 +1,8 @@
 /*--------------------------------------------------------------
   Awakening Heart : Oracle Opening Sequence
-  Version: 10.0.0 | 2025-11-16
+  Version: 10.1.0 | 2025-11-16
   
-  SIMPLIFIED DIVINATION SEQUENCE
+  FIXED DIVINATION SEQUENCE WITH PROPER HOLDS
   
   TRIGGER POINTS:
   1. Click to enter (after prompts) → Entry behavior (unchanged)
@@ -10,30 +10,32 @@
      - Shader reveals, audio starts, goddess appears
      - Metatron center becomes clickable
   
-  2. Click Metatron center (P_C) → SIMPLIFIED DIVINATION SEQUENCE
+  2. Click Metatron center (P_C) → FIXED DIVINATION SEQUENCE
      Step 1: Goddess docks at bottom (1.2s)
-             - Shrinks to 0.3 scale and moves to bottom
+             - Shrinks to 0.3 scale and moves down 15% vh
              - Remains visible throughout transition
-     Step 2: Facet animation plays (5s)
+     Step 2: Facet animation plays (5s) 
+             - Metatron LOCKED at 1.25 scale (no movement)
              - Sequential pattern for contemplation
-     Step 3: Title dissolves (1s)
-             - Fades out during facets
-     Step 4: Metatron shrinks to center (3s)
+     Step 3: Title dissolves (1s overlapping)
+             - Fades during last second of facets
+     Step 4: Metatron shrinks to center (3s) 
+             - AFTER facets complete
              - Rotates and shrinks to near-zero
              - Shader dissolves when Metatron ~30%
      
      Final state: Only Triple Goddess visible at bottom
      Total: ~10.7 seconds
   
-  Updates from v9.2.0:
-  - Simplified from 6 steps to 4 steps
-  - Goddess remains visible (docks at bottom)
-  - Removed growth phase for Metatron
-  - More straightforward sequencing
+  Updates from v10.0.0:
+  - Fixed goddess positioning (15% not 45% movement)
+  - Added explicit Metatron lock during facets
+  - Fixed timeline sequencing (shrink AFTER facets)
+  - Added scale verification during facet hold
 --------------------------------------------------------------*/
 
 document.addEventListener("DOMContentLoaded", () => {
-  console.log("💖 Awakening Heart : Oracle Opening initialized (v10.0.0)");
+  console.log("💖 Awakening Heart : Oracle Opening initialized (v10.1.0)");
 
   // ------- Core DOM -------
   const overlay   = document.getElementById("oracleOverlay") || document.getElementById("overlay");
@@ -324,9 +326,9 @@ document.addEventListener("DOMContentLoaded", () => {
       const vh = window.innerHeight;
       const vw = window.innerWidth;
       
-      // Move goddess to bottom - about 5% from bottom edge
-      // Use absolute positioning for precise docking
-      const dockY = vh * 0.45; // Move down 45% of viewport height
+      // Move goddess to bottom - small movement to dock at bottom edge
+      // Current position is likely near center, so move down modestly
+      const dockY = vh * 0.15; // Move down only 15% to stay on screen
       const dockScale = 0.3; // Small but visible size
       
       divinationTl.to(goddess, {
@@ -350,10 +352,22 @@ document.addEventListener("DOMContentLoaded", () => {
     divinationTl.to({}, { duration: 0.5 });
 
     // ============================================================
-    // STEP 2: FACET ANIMATION SEQUENCE (5s)
-    // Play the facet animation for contemplation
+    // STEP 2: LOCK METATRON & PLAY FACETS (5s)
+    // Explicitly lock Metatron at current scale while facets play
     // ============================================================
     const facetsLabel = divinationTl.addLabel("facets");
+    
+    // CRITICAL: Lock Metatron in place during facet animation
+    if (metatron) {
+      const currentScale = gsap.getProperty(metatron, "scale") || 1.25;
+      console.log("🔒 Locking Metatron at scale:", currentScale);
+      
+      // Use gsap.set to explicitly lock values
+      divinationTl.set(metatron, {
+        scale: currentScale,
+        rotation: gsap.getProperty(metatron, "rotation") || 0,
+      }, facetsLabel);
+    }
     
     // Start facets animation
     divinationTl.add(() => {
@@ -397,17 +411,30 @@ document.addEventListener("DOMContentLoaded", () => {
     }, facetsLabel);
     
     // Hold for full facet sequence (5 seconds total)
+    // During this time, Metatron stays locked at scale
     divinationTl.to({}, { 
       duration: 5.0,
-      onStart: () => console.log("⏳ Watching facet animation (5s)"),
-      onComplete: () => console.log("✅ Facet sequence complete")
+      onStart: () => {
+        console.log("⏳ Watching facet animation (5s)");
+        console.log("   Metatron locked at:", gsap.getProperty(metatron, "scale"));
+      },
+      onUpdate: function() {
+        // Verify Metatron stays locked during facets
+        if (this.progress() % 0.25 === 0) {
+          console.log(`   Facets ${Math.round(this.progress() * 100)}% - Metatron scale:`, gsap.getProperty(metatron, "scale"));
+        }
+      },
+      onComplete: () => {
+        console.log("✅ Facet sequence complete");
+        console.log("   Metatron still at:", gsap.getProperty(metatron, "scale"));
+      }
     }, facetsLabel);
 
     // ============================================================
     // STEP 3: TITLE DISSOLVES (1s)
-    // Title fades out during/after facets
+    // Title fades out after most of facets have played
     // ============================================================
-    const titleLabel = divinationTl.addLabel("titleDissolve", "facets+=3.5");
+    const titleLabel = divinationTl.addLabel("titleDissolve", "facets+=4.0");
     
     if (title) {
       divinationTl.to(title, {
@@ -421,10 +448,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // ============================================================
     // STEP 4: METATRON SHRINKS TO CENTER (3s)
-    // Metatron rotates and shrinks to center
-    // Shader dissolves when Metatron reaches ~30% scale
+    // NOW Metatron rotates and shrinks - AFTER facets complete
     // ============================================================
-    const shrinkLabel = divinationTl.addLabel("metatronShrink", "facets+=5");
+    const shrinkLabel = divinationTl.addLabel("metatronShrink", "facets+=5.5");
     
     if (metatron) {
       console.log("🌀 Starting Metatron shrink and rotation");
@@ -489,6 +515,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
     
     console.log("🎬 Divination sequence started - Total duration: ~10.7s");
+    console.log("   Timeline: Goddess(1.2s) → Pause(0.5s) → Facets(5s) → Shrink(3s)");
   }
 
   // ------- Enable Metatron Center Navigation -------
