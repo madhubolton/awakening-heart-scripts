@@ -1,6 +1,6 @@
 /*--------------------------------------------------------------
   Awakening Heart : Oracle Opening Sequence
-  Version: 9.1.0 | 2025-11-15
+  Version: 9.2.0 | 2025-11-15
   
   TRIGGER POINTS:
   1. Click to enter (after prompts) → Entry behavior (unchanged)
@@ -8,27 +8,34 @@
      - Shader reveals, audio starts, goddess appears
      - Metatron center becomes clickable
   
-  2. Click Metatron center (P_C) → REVISED DIVINATION SEQUENCE
-     Step 1: Goddess descends (1.2s + pause)
+  2. Click Metatron center (P_C) → REFINED DIVINATION SEQUENCE
+     Step 1: Goddess descends (1.7s + pause)
+             - Scales to 0.7 AND moves down screen
      Step 2: Metatron grows & rotates (2.5s)
+             - Dramatic growth to 2.0x scale
              - Title & goddess dissolve during this
-     Step 3: Rotation stops (0.3s + pause)
-     Step 4: Facets animate (4.5s - watch for several seconds)
+     Step 3: Rotation stops (1.3s total)
+             - Settles at peak size
+             - Significant 1s pause
+     Step 4: Facets animate (5s - watch for several seconds)
+             - Sequential pattern builds
+             - Extended contemplation time
      Step 5: Dissolution (2.5s - rotate & shrink)
+             - Shader dissolves early (1.5s)
+             - Metatron shrinks to void
      Step 6: Void (0.5s hold)
-     Total: ~12 seconds
+     Total: ~13 seconds
   
-  Updates from v9.0.1:
-  - Slowed down overall pace with pauses
-  - Goddess descends first (separate step)
-  - Title/goddess dissolve WHILE Metatron grows
-  - Rotation stops BEFORE facets animate
-  - Longer facet display time (4.5s total)
-  - Contemplative pacing throughout
+  Updates from v9.1.0:
+  - Goddess now moves down (15% vh) in addition to scaling
+  - Metatron scale increased to 2.0 (more dramatic)
+  - Pause at peak increased to 1.0s (more significant)
+  - Facet display time increased to 5.0s total
+  - Shader dissolves early (before Metatron reaches 20%)
 --------------------------------------------------------------*/
 
 document.addEventListener("DOMContentLoaded", () => {
-  console.log("💖 Awakening Heart : Oracle Opening initialized (v9.1.0)");
+  console.log("💖 Awakening Heart : Oracle Opening initialized (v9.2.0)");
 
   // ------- Core DOM -------
   const overlay   = document.getElementById("oracleOverlay") || document.getElementById("overlay");
@@ -300,17 +307,20 @@ document.addEventListener("DOMContentLoaded", () => {
     const goddessLabel = divinationTl.addLabel("goddessDescend");
     
     if (goddess) {
-      // Goddess is already at bottom from entry - just scale down and subtle settle
+      // Goddess scales down and moves down the screen
+      // Calculate a controlled downward movement
+      const vh = window.innerHeight;
+      const goddessDropDistance = vh * 0.15; // Move down 15% of viewport height
       
-      // Scale down in place
       divinationTl.to(goddess, {
+        y: `+=${goddessDropDistance}`, // Move down from current position
         scale: 0.7,
         duration: 1.2,
         ease: "power2.inOut",
         transformOrigin: "50% 50%"
       }, goddessLabel);
       
-      // Micro-bounce - very subtle settle (just scale, no Y movement)
+      // Micro-bounce - very subtle settle (scale compression)
       divinationTl.to(goddess, {
         scale: 0.68, // Tiny compression
         duration: 0.2,
@@ -325,20 +335,20 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     
     // Small pause after goddess lands
-    divinationTl.to({}, { duration: 1.3 });
+    divinationTl.to({}, { duration: 0.3 });
 
     // ============================================================
     // STEP 2: METATRON GROWS & ROTATES (2.5s)
-    // Lazy rotation begins, grows to 120%
+    // Lazy rotation begins, grows to dramatic size
     // Title and Goddess dissolve WHILE this happens
     // ============================================================
     const growLabel = divinationTl.addLabel("metatronGrow");
     
     if (metatron) {
-      // Lazy spin and scale UP (from 1.25 to 1.5 = 120% increase)
+      // Lazy spin and scale UP dramatically (from 1.25 to 2.0 = 160% increase)
       divinationTl.to(metatron, {
         rotation: 360,
-        scale: 2.5,  // Grow from 1.25 to 1.5 (120% of 1.25)
+        scale: 2.0,  // Much more pronounced growth!
         duration: 2.5,
         ease: "power1.inOut",
         transformOrigin: "50% 50%"
@@ -365,22 +375,22 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // ============================================================
     // STEP 3: ROTATION STOPS (0.3s)
-    // Metatron reaches 120%, rotation stops
+    // Metatron reaches peak size, rotation stops
     // ============================================================
     const stopLabel = divinationTl.addLabel("rotationStop", "metatronGrow+=2.5");
     
     if (metatron) {
-      // Lock in final scale, no rotation change (stay at 360°)
+      // Lock in final dramatic scale, no rotation change (stay at 360°)
       divinationTl.to(metatron, {
-        scale: 2.5,
+        scale: 2.0,
         // Don't animate rotation - let it stay at 360°
         duration: 0.3,
         ease: "power2.out"
       }, stopLabel);
     }
     
-    // Brief pause at stillness
-    divinationTl.to({}, { duration: 3.4 });
+    // Significant pause at stillness (1 second)
+    divinationTl.to({}, { duration: 1.0 });
 
     // ============================================================
     // STEP 4: FACET ANIMATION (3-4s)
@@ -420,17 +430,27 @@ document.addEventListener("DOMContentLoaded", () => {
     }, facetsLabel);
     
     // Hold to watch the facet animation complete and linger
-    // 24 facets * 0.08 stagger = ~2s for sequence + 1.2s duration + 1s hold = ~4.2s total
-    divinationTl.to({}, { duration: 4.5 }, facetsLabel);
+    // 24 facets * 0.08 stagger = ~2s for sequence + 1.2s duration + 2s hold = ~5s total
+    divinationTl.to({}, { duration: 5.0 }, facetsLabel);
 
     // ============================================================
     // STEP 5: DISSOLUTION (2.5s)
     // Metatron rotates again and shrinks to center
+    // Shader dissolves EARLY (before Metatron reaches 20%)
     // ============================================================
     const dissolveLabel = divinationTl.addLabel("dissolution");
     
+    // Shader dissolves early in the sequence
+    if (shaderW) {
+      divinationTl.to(shaderW, {
+        autoAlpha: 0,
+        duration: 1.5,
+        ease: "power2.in"
+      }, dissolveLabel);
+    }
+    
     if (metatron) {
-      // Rotate and shrink to void (from 1.5 to 0.01)
+      // Rotate and shrink to void (from 2.0 to 0.01)
       divinationTl.to(metatron, {
         scale: 0.01,
         rotation: "+=180", // Gentle rotation (360° → 540°)
