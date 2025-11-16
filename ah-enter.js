@@ -325,7 +325,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     
     // Small pause after goddess lands
-    divinationTl.to({}, { duration: 0.3 });
+    divinationTl.to({}, { duration: 1.3 });
 
     // ============================================================
     // STEP 2: METATRON GROWS & ROTATES (2.5s)
@@ -338,7 +338,7 @@ document.addEventListener("DOMContentLoaded", () => {
       // Lazy spin and scale UP (from 1.25 to 1.5 = 120% increase)
       divinationTl.to(metatron, {
         rotation: 360,
-        scale: 1.5,  // Grow from 1.25 to 1.5 (120% of 1.25)
+        scale: 2.5,  // Grow from 1.25 to 1.5 (120% of 1.25)
         duration: 2.5,
         ease: "power1.inOut",
         transformOrigin: "50% 50%"
@@ -372,7 +372,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (metatron) {
       // Lock in final scale, no rotation change (stay at 360°)
       divinationTl.to(metatron, {
-        scale: 1.5,
+        scale: 2.5,
         // Don't animate rotation - let it stay at 360°
         duration: 0.3,
         ease: "power2.out"
@@ -380,7 +380,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     
     // Brief pause at stillness
-    divinationTl.to({}, { duration: 0.4 });
+    divinationTl.to({}, { duration: 3.4 });
 
     // ============================================================
     // STEP 4: FACET ANIMATION (3-4s)
