@@ -312,6 +312,16 @@
   function playBreathSound() {
     if (!State.breathAudio || !State.backgroundAudio) return;
     
+    // Check if audio is enabled (respect user's audio toggle)
+    const audioEnabled = window.AHAudioState 
+      ? window.AHAudioState.getState().isPlaying 
+      : !State.backgroundAudio.paused;
+    
+    if (!audioEnabled) {
+      console.log('🔇 Audio muted - skipping breath sound');
+      return;
+    }
+    
     // Duck background audio
     const originalVolume = State.backgroundAudio.volume;
     gsap.to(State.backgroundAudio, {
@@ -594,7 +604,7 @@
   /**
    * Enter meditation mode
    * - Goddess drops to dock position
-   * - Metatron teleports from top to center
+   * - Metatron brightens to full opacity (stays centered)
    * - Title breathes back to center
    * - Meditation audio crossfades in
    * - Facet animation starts
@@ -653,31 +663,14 @@
       }, 0.2);
     }
     
-    // Metatron teleport sequence
-    // Phase 1: Shrink at current position (top)
-    // Phase 2: Instant reposition to center
-    // Phase 3: Grow at center
+    // Metatron brightens to full opacity (stays centered at scale 1.25)
     if (DOM.metatron) {
-      // Phase 1: Shrink
       tl.to(DOM.metatron, {
-        scale: 0.01,
-        duration: 0.7,
-        ease: 'power2.in',
-        onStart: () => console.log('🌀 Metatron teleporting')
-      }, 0.3);
-      
-      // Phase 2: Reposition (instant)
-      tl.set(DOM.metatron, {
-        y: 0, // Reset to center position
-        x: 0
-      });
-      
-      // Phase 3: Grow
-      tl.to(DOM.metatron, {
-        scale: 1.25,
+        opacity: 1.0,
         duration: 0.9,
-        ease: 'power2.out'
-      });
+        ease: 'power2.out',
+        onStart: () => console.log('✨ Metatron brightening')
+      }, 0.3);
     }
     
     // Title breathes back to center
@@ -771,27 +764,14 @@
       }, 0.2);
     }
     
-    // Metatron teleport back to top
+    // Metatron dims back to 30% opacity (stays centered at scale 1.25)
     if (DOM.metatron) {
-      // Shrink at center
       tl.to(DOM.metatron, {
-        scale: 0.01,
+        opacity: 0.3,
         duration: 0.7,
         ease: 'power2.in',
-        onStart: () => console.log('🌀 Metatron returning to top')
+        onStart: () => console.log('🌀 Metatron dimming')
       }, 0.3);
-      
-      // Instant reposition (clear Y to let CSS take over)
-      tl.set(DOM.metatron, {
-        clearProps: 'y,x' // Remove GSAP overrides, use CSS positioning
-      });
-      
-      // Grow at top
-      tl.to(DOM.metatron, {
-        scale: 1,
-        duration: 0.9,
-        ease: 'power2.out'
-      });
     }
     
     // Crossfade audio back to background
@@ -1033,12 +1013,23 @@
     
     if (window.AHAudioState) {
       await window.AHAudioState.toggle(activeAudio, DOM.audioIcon);
+      
+      // Also handle breath sound
+      if (State.breathAudio) {
+        const audioState = window.AHAudioState.getState();
+        if (!audioState.isPlaying) {
+          State.breathAudio.pause();
+          State.breathAudio.volume = 0;
+        } else {
+          State.breathAudio.volume = CONFIG.audioVolume;
+        }
+      }
     } else {
-      // Fallback toggle - handles both audios
+      // Fallback toggle - handles all audios
       const isPlaying = !activeAudio.paused;
       
       if (isPlaying) {
-        // Pause both audios
+        // Pause all audios
         if (State.backgroundAudio) {
           gsap.to(State.backgroundAudio, {
             volume: 0,
@@ -1053,6 +1044,10 @@
             onComplete: () => State.meditationAudio.pause()
           });
         }
+        if (State.breathAudio) {
+          State.breathAudio.pause();
+          State.breathAudio.volume = 0;
+        }
         if (DOM.audioIcon) {
           gsap.to(DOM.audioIcon, { opacity: 0.4, duration: 0.3 });
         }
@@ -1066,6 +1061,10 @@
             volume: CONFIG.audioVolume,
             duration: 0.3
           });
+          // Re-enable breath sound
+          if (State.breathAudio) {
+            State.breathAudio.volume = CONFIG.audioVolume;
+          }
           if (DOM.audioIcon) {
             gsap.to(DOM.audioIcon, { opacity: 1, duration: 0.3 });
           }
@@ -1095,22 +1094,26 @@
       }
     });
     
-    // Set goddess initial state
+    // Set goddess initial state (matches entry script end state)
     if (DOM.goddess) {
       gsap.set(DOM.goddess, {
         y: 0,
         scale: 1,
+        autoAlpha: 1,
         cursor: 'pointer',
         pointerEvents: 'auto',
         transformOrigin: '50% 50%'
       });
     }
     
-    // Set metatron initial state (preserve Webflow position)
+    // Set metatron initial state (matches entry script end state)
+    // Centered, scale 1.25, but dimmed to 30% opacity during content navigation
     if (DOM.metatron) {
-      // Don't override Y position - let Webflow CSS handle it
       gsap.set(DOM.metatron, {
-        scale: 1,
+        y: 0,
+        x: 0,
+        scale: 1.25,
+        opacity: 0.3, // Dimmed during content
         transformOrigin: '50% 50%',
         force3D: true
       });
