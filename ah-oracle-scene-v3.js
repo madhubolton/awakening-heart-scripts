@@ -1,27 +1,17 @@
 /*--------------------------------------------------------------
-  Awakening Heart : Oracle Scene Controller v3.0
-  Version: 3.0.0 | Date: 2025-11-20
+  Awakening Heart : Oracle Scene Controller v3.1
+  Version: 3.1.0 | Date: 2025-11-20
+  
+  FIXES:
+  - Resolved duplicate goddess rendering
+  - Fixed clickability issues (goddess, center)
+  - Fixed cursor disappearing over Metatron
+  - Eliminated flash on load
+  - Improved z-index management
   
   COMPLETE CYCLICAL FLOW:
-  
   Entry Scene → Divination → New Scene Entry → Content Navigation → 
   Meditation Mode → Divination → (cycle repeats)
-  
-  KEY FEATURES:
-  - Scene entry animation (Metatron spiral up, continuity)
-  - Content mode: Goddess docked at bottom, Metatron dimmed
-  - Meditation mode: Goddess centered, Metatron bright, center clickable
-  - Bidirectional content navigation with breathing transitions
-  - Weighted scene selection with 3-scene history
-  - Audio orchestration (background, meditation, breath, SFX)
-  
-  CONTENT FLOW:
-  Intro → Distinction → Quote → Share → Practice → Prompt0-4 → Meditation
-  
-  USER INTERACTIONS:
-  - Scroll/Swipe: Navigate through content blocks
-  - Click Goddess: Toggle between content and meditation
-  - Click Center: Trigger divination (meditation only)
 --------------------------------------------------------------*/
 
 (function() {
@@ -43,18 +33,18 @@
     // Audio volumes and fade durations
     audioVolume: 0.35,
     audioFadeDuration: 1.0,
-    breathDuckAmount: 0.15, // -6dB ducking during breath
+    breathDuckAmount: 0.15,
     
     // Goddess positions and scales
-    goddessDockY: '20vh',        // Bottom dock position (matches entry end)
-    goddessDockScale: 0.5,       // Dock size
-    goddessCenterY: 0,           // Center position (meditation)
-    goddessCenterScale: 1.0,     // Full size at center
+    goddessDockY: '20vh',
+    goddessDockScale: 0.5,
+    goddessCenterY: 0,
+    goddessCenterScale: 1.0,
     
     // Metatron states
-    metatronContentOpacity: 0.3,    // Dimmed during content
-    metatronMeditationOpacity: 1.0, // Bright during meditation
-    metatronScale: 1.25,             // Default centered scale
+    metatronContentOpacity: 0.3,
+    metatronMeditationOpacity: 1.0,
+    metatronScale: 1.25,
     
     // Scene entry animation timing
     sceneEntryDuration: 2.0,
@@ -66,7 +56,7 @@
     // Divination animation timing
     divinationDuration: 2.6,
     
-    // Touch swipe detection (mobile)
+    // Touch swipe detection
     swipeMinDistance: 50,
     
     // LocalStorage keys
@@ -89,16 +79,13 @@
     lastContentBlockBeforeMeditation: 0,
     sceneEntryComplete: false,
     
-    // Touch tracking for mobile
     touchStartY: 0,
     touchStartX: 0,
     
-    // Audio elements
     backgroundAudio: null,
     meditationAudio: null,
     breathAudio: null,
     
-    // Animation tracking
     facetAnimation: null,
     isTransitioning: false
   };
@@ -111,14 +98,12 @@
   
   function cacheDOM() {
     DOM = {
-      // Core containers
       title: document.getElementById('ah-title'),
       metatron: document.getElementById('metatron'),
       metatronCenter: document.getElementById('P_C'),
       goddess: document.getElementById('triple-goddess-wrapper'),
       shader: document.querySelector('.shader-wrapper') || document.getElementById('shader'),
       
-      // Content blocks (in order)
       intro: document.getElementById('intro-text'),
       distinction: document.getElementById('distinction-text'),
       quote: document.getElementById('quote-text'),
@@ -130,7 +115,6 @@
       prompt3: document.getElementById('prompt3'),
       prompt4: document.getElementById('prompt4'),
       
-      // Audio elements
       bgMusic: document.getElementById('bgMusic'),
       meditationMusic: document.getElementById('meditationMusic'),
       breathSound: document.getElementById('breathSound'),
@@ -138,12 +122,10 @@
       centerClickSfx: document.getElementById('centerClickSfx'),
       divinationSfx: document.getElementById('divinationSfx'),
       
-      // UI elements
       audioToggle: document.getElementById('audioToggle'),
       audioIcon: document.querySelector('#audioToggle svg, #audioToggle .icon-On')
     };
     
-    // Build content blocks array (filter out null elements)
     State.contentBlocks = [
       DOM.intro,
       DOM.distinction,
@@ -162,12 +144,7 @@
       goddess: !!DOM.goddess,
       metatron: !!DOM.metatron,
       center: !!DOM.metatronCenter,
-      shader: !!DOM.shader,
-      audio: {
-        background: !!DOM.bgMusic,
-        meditation: !!DOM.meditationMusic,
-        breath: !!DOM.breathSound
-      }
+      shader: !!DOM.shader
     });
   }
 
@@ -175,19 +152,13 @@
   // SCENE POOL & RANDOMIZATION
   // ============================================================
   
-  /**
-   * Load available scenes from CMS collection list
-   */
   function loadScenePool() {
     const items = document.querySelectorAll('.scene-pool-item');
     const pool = Array.from(items).map(item => {
       let url = item.dataset.sceneUrl || '';
-      
-      // If URL doesn't start with /, it's just a slug - add /scenes/ prefix
       if (url && !url.startsWith('/')) {
         url = '/scenes/' + url;
       }
-      
       return {
         id: item.dataset.sceneId,
         url: url,
@@ -195,46 +166,32 @@
         realm: item.dataset.realm
       };
     });
-    
     console.log('🎲 Scene pool loaded:', pool.length, 'scenes');
     return pool;
   }
   
-  /**
-   * Get current scene ID from URL
-   */
   function getCurrentSceneId() {
     const path = window.location.pathname;
     const match = path.match(/\/scenes\/([^\/]+)/);
     return match ? match[1] : null;
   }
   
-  /**
-   * Get scene history from localStorage
-   */
   function getSceneHistory() {
     try {
       const stored = localStorage.getItem(CONFIG.storageKeys.sceneHistory);
       return stored ? JSON.parse(stored) : [];
     } catch (e) {
-      console.warn('Could not read scene history:', e);
       return [];
     }
   }
   
-  /**
-   * Save scene to history (keep last 3)
-   */
   function saveToHistory(sceneId) {
     try {
       let history = getSceneHistory();
       history.push(sceneId);
-      
-      // Keep only last 3
       if (history.length > 3) {
         history = history.slice(-3);
       }
-      
       localStorage.setItem(CONFIG.storageKeys.sceneHistory, JSON.stringify(history));
       console.log('💾 Scene history updated:', history);
     } catch (e) {
@@ -242,30 +199,20 @@
     }
   }
   
-  /**
-   * Select next scene using weighted randomization
-   * Excludes current scene and last 3 scenes from history
-   */
   function selectNextScene() {
     const pool = loadScenePool();
     const currentId = getCurrentSceneId();
     const history = getSceneHistory();
     
-    // Filter out current scene and history
     const excluded = [...history, currentId].filter(Boolean);
     const available = pool.filter(scene => !excluded.includes(scene.id));
     
     if (available.length === 0) {
-      console.warn('⚠️ No available scenes after filtering!');
-      // Fallback: use full pool minus current
       const fallback = pool.filter(scene => scene.id !== currentId);
       return fallback.length > 0 ? fallback[0] : null;
     }
     
-    // Calculate total weight
     const totalWeight = available.reduce((sum, scene) => sum + scene.weight, 0);
-    
-    // Weighted random selection
     let random = Math.random() * totalWeight;
     
     for (const scene of available) {
@@ -276,7 +223,6 @@
       }
     }
     
-    // Fallback (should never reach here)
     return available[0];
   }
 
@@ -284,9 +230,6 @@
   // AUDIO MANAGEMENT
   // ============================================================
   
-  /**
-   * Initialize audio with persistent state
-   */
   async function initAudio() {
     if (!DOM.bgMusic) return;
     
@@ -294,10 +237,8 @@
     State.meditationAudio = DOM.meditationMusic;
     State.breathAudio = DOM.breathSound;
     
-    // Get scene-specific audio URL
     const sceneAudioUrl = DOM.bgMusic.getAttribute('data-scene-audio') || DOM.bgMusic.src;
     
-    // Use AHAudioState if available for persistence
     if (window.AHAudioState) {
       try {
         await window.AHAudioState.initAudio(DOM.bgMusic, DOM.audioIcon, sceneAudioUrl);
@@ -306,47 +247,35 @@
         console.warn('Audio init failed:', e);
       }
     } else {
-      // Fallback: just set up audio element
       DOM.bgMusic.volume = CONFIG.audioVolume;
       DOM.bgMusic.loop = true;
       console.log('🎵 Audio initialized (no persistence)');
     }
     
-    // Setup meditation audio if present
     if (State.meditationAudio) {
       State.meditationAudio.volume = 0;
       State.meditationAudio.loop = true;
     }
     
-    // Setup breath audio if present
     if (State.breathAudio) {
       State.breathAudio.volume = CONFIG.audioVolume;
     }
   }
   
-  /**
-   * Play breath sound with ducking on background audio
-   */
   function playBreathSound() {
     if (!State.breathAudio || !State.backgroundAudio) return;
     
-    // Check if audio is enabled (respect user's audio toggle)
     const audioEnabled = window.AHAudioState 
       ? window.AHAudioState.getState().isPlaying 
       : !State.backgroundAudio.paused;
     
-    if (!audioEnabled) {
-      console.log('🔇 Audio muted - skipping breath sound');
-      return;
-    }
+    if (!audioEnabled) return;
     
-    // Duck background audio
     const originalVolume = State.backgroundAudio.volume;
     gsap.to(State.backgroundAudio, {
       volume: originalVolume * (1 - CONFIG.breathDuckAmount),
       duration: 0.2,
       onComplete: () => {
-        // Restore volume after breath completes
         gsap.to(State.backgroundAudio, {
           volume: originalVolume,
           duration: 0.3,
@@ -355,38 +284,23 @@
       }
     });
     
-    // Play breath sound
     State.breathAudio.currentTime = 0;
     State.breathAudio.play().catch(e => console.warn('Breath sound failed:', e));
   }
   
-  /**
-   * Crossfade from background to meditation audio
-   */
   async function crossfadeToMeditation() {
-    // If no meditation audio, just continue background
-    if (!State.meditationAudio) {
-      console.log('🎵 No meditation audio - continuing background');
-      return;
-    }
+    if (!State.meditationAudio) return;
     
-    // Check if user has audio enabled
     const audioState = window.AHAudioState ? window.AHAudioState.getState() : { isPlaying: !State.backgroundAudio.paused };
-    
-    if (!audioState.isPlaying) {
-      console.log('🔇 Audio paused - skipping crossfade');
-      return;
-    }
+    if (!audioState.isPlaying) return;
     
     console.log('🎵 Crossfading to meditation audio');
     
     try {
-      // Start meditation audio at 0 volume
       State.meditationAudio.currentTime = 0;
       State.meditationAudio.volume = 0;
       await State.meditationAudio.play();
       
-      // Crossfade
       gsap.to(State.backgroundAudio, {
         volume: 0,
         duration: CONFIG.audioFadeDuration,
@@ -402,24 +316,16 @@
     }
   }
   
-  /**
-   * Crossfade from meditation back to background audio
-   */
   async function crossfadeToBackground() {
-    if (!State.meditationAudio || State.meditationAudio.paused) {
-      console.log('🎵 No meditation audio playing - continuing background');
-      return;
-    }
+    if (!State.meditationAudio || State.meditationAudio.paused) return;
     
     console.log('🎵 Crossfading back to background audio');
     
     try {
-      // Resume background audio at 0 volume
       State.backgroundAudio.currentTime = 0;
       State.backgroundAudio.volume = 0;
       await State.backgroundAudio.play();
       
-      // Crossfade
       gsap.to(State.meditationAudio, {
         volume: 0,
         duration: CONFIG.audioFadeDuration,
@@ -435,12 +341,8 @@
     }
   }
   
-  /**
-   * Play SFX sound
-   */
   function playSfx(sfxElement) {
     if (!sfxElement) return;
-    
     sfxElement.currentTime = 0;
     sfxElement.volume = 0.5;
     sfxElement.play().catch(e => console.warn('SFX play failed:', e));
@@ -450,10 +352,6 @@
   // SCENE ENTRY ANIMATION
   // ============================================================
   
-  /**
-   * Scene entry animation - smooth receive from divination
-   * Provides visual continuity as new scene loads
-   */
   async function playSceneEntryAnimation() {
     console.log('🎬 Playing scene entry animation');
     
@@ -466,7 +364,7 @@
       }
     });
     
-    // 1) Metatron spirals UP from tiny center (reverse of divination)
+    // Metatron spirals UP from tiny center
     if (DOM.metatron) {
       tl.fromTo(DOM.metatron,
         {
@@ -478,7 +376,7 @@
         },
         {
           scale: CONFIG.metatronScale,
-          rotation: -720, // Reverse spin
+          rotation: -720,
           opacity: 1.0,
           duration: CONFIG.metatronSpiralDuration,
           ease: 'power2.out',
@@ -488,31 +386,29 @@
       );
     }
     
-    // 2) Shader fades IN
+    // Shader fades IN
     if (DOM.shader) {
       tl.fromTo(DOM.shader,
         { autoAlpha: 0 },
         {
           autoAlpha: 1,
           duration: 1.2,
-          ease: 'sine.inOut',
-          onStart: () => console.log('✨ Shader revealing')
+          ease: 'sine.inOut'
         },
         '-=1.0'
       );
     }
     
-    // 3) Metatron settles and dims to content mode
+    // Metatron dims to content mode
     if (DOM.metatron) {
       tl.to(DOM.metatron, {
         opacity: CONFIG.metatronContentOpacity,
         duration: 0.6,
-        ease: 'sine.out',
-        onStart: () => console.log('🌀 Metatron dimming to content mode')
+        ease: 'sine.out'
       });
     }
     
-    // 4) Title appears
+    // Title appears
     if (DOM.title) {
       tl.fromTo(DOM.title,
         { autoAlpha: 0, scale: 0 },
@@ -526,7 +422,7 @@
       );
     }
     
-    // 5) First content block breathes OUT
+    // First content block breathes OUT
     const firstBlock = State.contentBlocks[0];
     if (firstBlock) {
       tl.fromTo(firstBlock,
@@ -536,8 +432,7 @@
           scale: 1,
           duration: CONFIG.breathOut,
           ease: 'power2.out',
-          transformOrigin: '50% 50%',
-          onStart: () => console.log('📖 First content block appearing')
+          transformOrigin: '50% 50%'
         },
         '-=0.2'
       );
@@ -550,18 +445,6 @@
   // CONTENT NAVIGATION
   // ============================================================
   
-  /**
-   * Get the total breathing transition duration
-   */
-  function getBreathingDuration() {
-    return CONFIG.breathIn + CONFIG.breathPause + CONFIG.breathOut;
-  }
-  
-  /**
-   * Breathing animation: scale from/to 0, center origin
-   * IN: 1 → 0 (breathe in)
-   * OUT: 0 → 1 (breathe out)
-   */
   function breatheIn(element) {
     return gsap.to(element, {
       scale: 0,
@@ -583,9 +466,6 @@
     );
   }
   
-  /**
-   * Navigate to a specific content block with breathing transition
-   */
   function navigateToBlock(targetIndex) {
     if (State.isTransitioning) return;
     if (targetIndex < 0 || targetIndex >= State.contentBlocks.length) return;
@@ -598,45 +478,34 @@
     
     console.log(`📖 Navigating: ${State.currentBlockIndex} → ${targetIndex}`);
     
-    // Create breathing transition timeline
     const tl = gsap.timeline({
       onComplete: () => {
         State.currentBlockIndex = targetIndex;
         State.isTransitioning = false;
-        
-        // Re-enable scrolling after cooldown
         setTimeout(() => {
           State.canScroll = true;
         }, CONFIG.scrollCooldown);
       }
     });
     
-    // Play breath sound
     tl.add(() => playBreathSound());
     
-    // Current block breathes IN (contracts to center)
     if (currentBlock) {
       tl.add(breatheIn(currentBlock), 0);
     }
     
-    // Brief pause
     tl.to({}, { duration: CONFIG.breathPause });
     
-    // Next block breathes OUT (expands from center)
     tl.add(breatheOut(nextBlock));
     
     return tl;
   }
   
-  /**
-   * Navigate forward through content
-   */
   function navigateForward() {
     if (!State.canScroll || State.inMeditation || !State.sceneEntryComplete) return;
     
     const nextIndex = State.currentBlockIndex + 1;
     
-    // If at last block, trigger meditation mode
     if (nextIndex >= State.contentBlocks.length) {
       console.log('📿 Reached end of content - entering meditation');
       enterMeditationMode();
@@ -646,15 +515,11 @@
     navigateToBlock(nextIndex);
   }
   
-  /**
-   * Navigate backward through content
-   */
   function navigateBackward() {
     if (!State.canScroll || State.inMeditation || !State.sceneEntryComplete) return;
     
     const prevIndex = State.currentBlockIndex - 1;
     
-    // Locked at first block
     if (prevIndex < 0) {
       console.log('🔒 Already at first block');
       return;
@@ -667,18 +532,11 @@
   // MEDITATION MODE
   // ============================================================
   
-  /**
-   * Start facet animation pattern
-   */
   function startFacetAnimation() {
-    if (!window.metatron || !window.AHCONFIG) {
-      console.warn('⚠️ Metatron engine or config not available');
-      return;
-    }
+    if (!window.metatron || !window.AHCONFIG) return;
     
     console.log('✨ Starting facet animation pattern');
     
-    // Use scene config or fallback to sequential pattern
     const facetConfig = window.AHCONFIG.facets || {
       pattern: 'sequential',
       ids: [
@@ -709,9 +567,6 @@
     }
   }
   
-  /**
-   * Stop facet animation pattern
-   */
   function stopFacetAnimation() {
     if (window.metatron && window.metatron.stopFacets) {
       console.log('🛑 Stopping facet animation');
@@ -719,22 +574,11 @@
     }
   }
   
-  /**
-   * Enter meditation mode
-   * - Content fades out
-   * - Goddess rises to center
-   * - Metatron brightens to full opacity
-   * - Title breathes back if needed
-   * - Meditation audio crossfades in
-   * - Facet animation starts
-   * - Center becomes clickable
-   */
   function enterMeditationMode() {
     if (State.inMeditation || !State.sceneEntryComplete) return;
     
     console.log('🧘 Entering meditation mode');
     
-    // Save state
     State.lastContentBlockBeforeMeditation = State.currentBlockIndex;
     State.inMeditation = true;
     State.canScroll = false;
@@ -754,7 +598,7 @@
       }
     });
     
-    // Hide current content block
+    // Hide current content
     const currentBlock = State.contentBlocks[State.currentBlockIndex];
     if (currentBlock) {
       tl.to(currentBlock, {
@@ -765,7 +609,7 @@
       }, 0);
     }
     
-    // Goddess rises to center and scales up
+    // Goddess rises to center
     if (DOM.goddess) {
       tl.to(DOM.goddess, {
         y: CONFIG.goddessCenterY,
@@ -776,17 +620,16 @@
       }, 0.2);
     }
     
-    // Metatron brightens to full opacity
+    // Metatron brightens
     if (DOM.metatron) {
       tl.to(DOM.metatron, {
         opacity: CONFIG.metatronMeditationOpacity,
         duration: 0.9,
-        ease: 'power2.out',
-        onStart: () => console.log('✨ Metatron brightening')
+        ease: 'power2.out'
       }, 0.3);
     }
     
-    // Ensure title is visible (breathe back if needed)
+    // Ensure title visible
     if (DOM.title) {
       const titleVisible = gsap.getProperty(DOM.title, 'autoAlpha') > 0.5;
       if (!titleVisible) {
@@ -803,38 +646,26 @@
       }
     }
     
-    // Start meditation audio crossfade
     tl.add(() => crossfadeToMeditation(), '-=0.8');
-    
-    // Start facet animation
     tl.add(() => startFacetAnimation(), '-=0.3');
   }
   
-  /**
-   * Exit meditation mode and return to content
-   */
   function exitMeditationMode() {
     if (!State.inMeditation) return;
     
     console.log('📖 Exiting meditation mode');
     
-    // Disable center divination
     disableCenterDivination();
-    
-    // Stop facet animation
     stopFacetAnimation();
     
-    // Determine which block to return to
     let returnIndex = State.lastContentBlockBeforeMeditation;
     
-    // Special case: If entered meditation from final prompt, return to prompt0
     const finalPromptIndex = State.contentBlocks.length - 1;
     if (State.lastContentBlockBeforeMeditation === finalPromptIndex) {
-      // Find prompt0 index
       const prompt0Index = State.contentBlocks.findIndex(block => block === DOM.prompt0);
       if (prompt0Index !== -1) {
         returnIndex = prompt0Index;
-        console.log('🔄 Returning to Prompt0 (entered from final prompt)');
+        console.log('🔄 Returning to Prompt0');
       }
     }
     
@@ -856,31 +687,27 @@
       }
     });
     
-    // Goddess drops to dock position
+    // Goddess drops to dock
     if (DOM.goddess) {
       tl.to(DOM.goddess, {
         y: CONFIG.goddessDockY,
         scale: CONFIG.goddessDockScale,
         duration: CONFIG.meditationTransitionDuration,
-        ease: 'power2.inOut',
-        onStart: () => console.log('🌙 Goddess dropping to dock')
+        ease: 'power2.inOut'
       }, 0);
     }
     
-    // Metatron dims back to content opacity
+    // Metatron dims
     if (DOM.metatron) {
       tl.to(DOM.metatron, {
         opacity: CONFIG.metatronContentOpacity,
         duration: 0.7,
-        ease: 'power2.in',
-        onStart: () => console.log('🌀 Metatron dimming')
+        ease: 'power2.in'
       }, 0.3);
     }
     
-    // Crossfade audio back to background
     tl.add(() => crossfadeToBackground(), '-=0.8');
     
-    // Reveal content block with breathing animation
     const targetBlock = State.contentBlocks[returnIndex];
     if (targetBlock) {
       tl.add(() => breatheOut(targetBlock), '-=0.3');
@@ -891,9 +718,6 @@
   // CENTER DIVINATION
   // ============================================================
   
-  /**
-   * Enable center click for divination
-   */
   function enableCenterDivination() {
     if (!DOM.metatronCenter) {
       console.warn('⚠️ Metatron center (P_C) not found');
@@ -908,7 +732,6 @@
       opacity: 0.8
     });
     
-    // Gentle pulse to indicate interactivity
     gsap.to(DOM.metatronCenter, {
       opacity: 1,
       scale: 1.05,
@@ -920,9 +743,6 @@
     });
   }
   
-  /**
-   * Disable center divination
-   */
   function disableCenterDivination() {
     if (!DOM.metatronCenter) return;
     
@@ -933,22 +753,13 @@
     });
   }
   
-  /**
-   * Trigger divination sequence and navigate to next scene
-   */
   function triggerDivination() {
     console.log('🔮 Divination triggered');
     
-    // Play divination SFX
     playSfx(DOM.divinationSfx);
-    
-    // Disable further clicks
     disableCenterDivination();
-    
-    // Stop facet animation
     stopFacetAnimation();
     
-    // Select next scene
     const nextScene = selectNextScene();
     
     if (!nextScene) {
@@ -956,13 +767,11 @@
       return;
     }
     
-    // Save current scene to history
     const currentId = getCurrentSceneId();
     if (currentId) {
       saveToHistory(currentId);
     }
     
-    // Divination animation sequence
     const tl = gsap.timeline({
       defaults: { ease: 'power2.inOut' },
       onComplete: () => {
@@ -971,7 +780,7 @@
       }
     });
     
-    // 1) If goddess is at center, drop her to dock first
+    // Drop goddess to dock if at center
     const goddessY = gsap.getProperty(DOM.goddess, 'y');
     const isGoddessAtCenter = (typeof goddessY === 'string' && goddessY === '0px') || goddessY === 0;
     
@@ -980,12 +789,11 @@
         y: CONFIG.goddessDockY,
         scale: CONFIG.goddessDockScale,
         duration: 0.8,
-        ease: 'power2.in',
-        onStart: () => console.log('🌙 Goddess dropping to dock for continuity')
+        ease: 'power2.in'
       });
     }
     
-    // 2) Brief ritual animation - center pulses and expands
+    // Center ritual animation
     if (DOM.metatronCenter) {
       tl.to(DOM.metatronCenter, {
         scale: 1.5,
@@ -1001,7 +809,7 @@
       });
     }
     
-    // 3) Fade title
+    // Fade title
     if (DOM.title) {
       tl.to(DOM.title, {
         autoAlpha: 0,
@@ -1011,7 +819,7 @@
       }, '-=0.6');
     }
     
-    // 4) Fade out shader
+    // Fade shader
     if (DOM.shader) {
       tl.to(DOM.shader, {
         autoAlpha: 0,
@@ -1020,7 +828,7 @@
       }, '-=1.0');
     }
     
-    // 5) Metatron spins and shrinks to center
+    // Metatron shrinks and spins
     if (DOM.metatron) {
       tl.to(DOM.metatron, {
         scale: 0.01,
@@ -1028,12 +836,11 @@
         duration: CONFIG.divinationDuration,
         ease: 'power2.in',
         force3D: true,
-        transformOrigin: '50% 50%',
-        onStart: () => console.log('🌀 Metatron shrinking and spinning')
+        transformOrigin: '50% 50%'
       }, '-=1.8');
     }
     
-    // 6) Fade out all Metatron shapes
+    // Fade Metatron shapes
     tl.add(() => {
       const allShapes = document.querySelectorAll('#metatron polygon, #metatron polyline');
       gsap.to(allShapes, {
@@ -1043,42 +850,27 @@
       });
     }, '-=2.0');
     
-    // 7) Brief hold with goddess as the only visible anchor
-    tl.to({}, { 
-      duration: 0.5,
-      onStart: () => {
-        console.log('🌙 Final state - Goddess docked, ready for next scene');
-      }
-    });
+    tl.to({}, { duration: 0.5 });
   }
 
   // ============================================================
   // EVENT HANDLERS
   // ============================================================
   
-  /**
-   * Mouse wheel handler (desktop)
-   */
   function handleWheel(e) {
     if (State.inMeditation || !State.canScroll || !State.sceneEntryComplete) return;
     
     e.preventDefault();
     
     if (e.deltaY < 0) {
-      // Scrolling up
       navigateBackward();
     } else if (e.deltaY > 0) {
-      // Scrolling down
       navigateForward();
     }
   }
   
-  /**
-   * Touch handlers (mobile)
-   */
   function handleTouchStart(e) {
     if (State.inMeditation || !State.sceneEntryComplete) return;
-    
     State.touchStartY = e.touches[0].clientY;
     State.touchStartX = e.touches[0].clientX;
   }
@@ -1092,22 +884,16 @@
     const deltaY = State.touchStartY - touchEndY;
     const deltaX = Math.abs(State.touchStartX - touchEndX);
     
-    // Only trigger if vertical swipe is dominant and meets minimum distance
     if (Math.abs(deltaY) < CONFIG.swipeMinDistance) return;
-    if (deltaX > Math.abs(deltaY)) return; // Horizontal swipe, ignore
+    if (deltaX > Math.abs(deltaY)) return;
     
     if (deltaY > 0) {
-      // Swiped up (scroll forward)
       navigateForward();
     } else {
-      // Swiped down (scroll backward)
       navigateBackward();
     }
   }
   
-  /**
-   * Goddess click handler - toggles meditation mode
-   */
   function handleGoddessClick(e) {
     e.stopPropagation();
     
@@ -1116,7 +902,6 @@
     console.log('🌙 Goddess clicked');
     playSfx(DOM.goddessClickSfx);
     
-    // Pulse animation
     const fullCircle = DOM.goddess.querySelector('#full-circle');
     if (fullCircle) {
       gsap.to(fullCircle, {
@@ -1129,7 +914,6 @@
       });
     }
     
-    // Toggle meditation state
     if (State.inMeditation) {
       exitMeditationMode();
     } else {
@@ -1137,9 +921,6 @@
     }
   }
   
-  /**
-   * Center click handler (divination) - only active in meditation mode
-   */
   function handleCenterClick(e) {
     e.stopPropagation();
     
@@ -1151,13 +932,9 @@
     triggerDivination();
   }
   
-  /**
-   * Audio toggle handler
-   */
   async function handleAudioToggle(e) {
     e.stopPropagation();
     
-    // Determine which audio is currently active
     const activeAudio = (State.inMeditation && State.meditationAudio && !State.meditationAudio.paused) 
       ? State.meditationAudio 
       : State.backgroundAudio;
@@ -1167,7 +944,6 @@
     if (window.AHAudioState) {
       await window.AHAudioState.toggle(activeAudio, DOM.audioIcon);
       
-      // Also handle breath sound
       if (State.breathAudio) {
         const audioState = window.AHAudioState.getState();
         if (!audioState.isPlaying) {
@@ -1178,11 +954,9 @@
         }
       }
     } else {
-      // Fallback toggle - handles all audios
       const isPlaying = !activeAudio.paused;
       
       if (isPlaying) {
-        // Pause all audios
         if (State.backgroundAudio) {
           gsap.to(State.backgroundAudio, {
             volume: 0,
@@ -1205,7 +979,6 @@
           gsap.to(DOM.audioIcon, { opacity: 0.4, duration: 0.3 });
         }
       } else {
-        // Play active audio
         try {
           if (activeAudio.paused) {
             await activeAudio.play();
@@ -1214,7 +987,6 @@
             volume: CONFIG.audioVolume,
             duration: 0.3
           });
-          // Re-enable breath sound
           if (State.breathAudio) {
             State.breathAudio.volume = CONFIG.audioVolume;
           }
@@ -1232,18 +1004,19 @@
   // INITIALIZATION
   // ============================================================
   
-  /**
-   * Setup initial state for scene entry
-   */
   function setupInitialState() {
     console.log('🎬 Setting up initial scene state');
     
-    // Hide all content blocks initially
+    // CRITICAL: Immediately hide all content blocks to prevent flash
     State.contentBlocks.forEach((block) => {
-      gsap.set(block, { autoAlpha: 0, scale: 0 });
+      if (block) {
+        block.style.visibility = 'hidden';
+        block.style.opacity = '0';
+        gsap.set(block, { autoAlpha: 0, scale: 0 });
+      }
     });
     
-    // Set goddess initial state - DOCKED AT BOTTOM (matches entry scene end)
+    // Goddess at dock (matches entry scene end)
     if (DOM.goddess) {
       gsap.set(DOM.goddess, {
         y: CONFIG.goddessDockY,
@@ -1251,36 +1024,49 @@
         autoAlpha: 1,
         cursor: 'pointer',
         pointerEvents: 'auto',
-        transformOrigin: '50% 50%'
+        transformOrigin: '50% 50%',
+        zIndex: 50
       });
       console.log('🌙 Goddess initialized at dock position');
     }
     
-    // Set metatron initial state - TINY AT CENTER (ready to spiral up)
+    // Metatron tiny at center (ready to spiral up)
     if (DOM.metatron) {
       gsap.set(DOM.metatron, {
         y: 0,
         x: 0,
-        scale: 0.01, // Tiny, ready to grow
-        opacity: 0,  // Invisible, will fade in
+        scale: 0.01,
+        opacity: 0,
         rotation: 0,
         transformOrigin: '50% 50%',
-        force3D: true
+        force3D: true,
+        cursor: 'default',
+        pointerEvents: 'none'
       });
-      console.log('🌀 Metatron initialized at tiny center (ready for spiral)');
+      
+      // Ensure Metatron shapes don't block interaction
+      const metatronShapes = DOM.metatron.querySelectorAll('polygon, polyline, path, circle');
+      metatronShapes.forEach(shape => {
+        gsap.set(shape, { pointerEvents: 'none' });
+      });
+      
+      console.log('🌀 Metatron initialized at tiny center');
     }
     
-    // Set title initial state - hidden
+    // Title hidden
     if (DOM.title) {
       gsap.set(DOM.title, { autoAlpha: 0, scale: 0 });
     }
     
-    // Set shader initial state - hidden
+    // Shader hidden
     if (DOM.shader) {
-      gsap.set(DOM.shader, { autoAlpha: 0 });
+      gsap.set(DOM.shader, { 
+        autoAlpha: 0,
+        pointerEvents: 'none'
+      });
     }
     
-    // Disable center initially (not clickable until meditation)
+    // Center disabled
     if (DOM.metatronCenter) {
       gsap.set(DOM.metatronCenter, {
         pointerEvents: 'none',
@@ -1288,67 +1074,45 @@
       });
     }
     
-    // Initialize as content mode (not meditation)
     State.inMeditation = false;
-    State.canScroll = false; // Will enable after entry animation
+    State.canScroll = false;
     State.sceneEntryComplete = false;
   }
   
-  /**
-   * Attach all event listeners
-   */
   function attachEventListeners() {
     console.log('🔗 Attaching event listeners');
     
-    // Wheel events (desktop)
     window.addEventListener('wheel', handleWheel, { passive: false });
-    
-    // Touch events (mobile)
     window.addEventListener('touchstart', handleTouchStart, { passive: true });
     window.addEventListener('touchend', handleTouchEnd, { passive: true });
     
-    // Goddess click - ALWAYS enabled (toggles meditation)
     if (DOM.goddess) {
       DOM.goddess.addEventListener('click', handleGoddessClick);
+      console.log('✅ Goddess click handler attached');
     }
     
-    // Center click - only active in meditation mode
     if (DOM.metatronCenter) {
       DOM.metatronCenter.addEventListener('click', handleCenterClick);
+      console.log('✅ Center click handler attached');
     }
     
-    // Audio toggle
     if (DOM.audioToggle) {
       DOM.audioToggle.addEventListener('click', handleAudioToggle);
     }
   }
   
-  /**
-   * Main initialization
-   */
   async function init() {
-    console.log('💖 Oracle Scene Controller v3.0 initializing...');
+    console.log('💖 Oracle Scene Controller v3.1 initializing...');
     
-    // Cache DOM elements
     cacheDOM();
-    
-    // Setup initial state (goddess docked, metatron tiny)
     setupInitialState();
-    
-    // Initialize audio
     await initAudio();
-    
-    // Attach event listeners
     attachEventListeners();
-    
-    // Play scene entry animation
     await playSceneEntryAnimation();
     
-    // Start scene animations if configured (portals only, facets wait for meditation)
     if (window.metatron && window.AHCONFIG) {
       const timing = window.AHCONFIG.timing || {};
       
-      // Start portals if configured
       if (timing.portalsDelay !== undefined) {
         setTimeout(() => {
           if (window.metatron.startPortals) {
@@ -1361,7 +1125,6 @@
     console.log('✨ Oracle Scene Controller ready - content mode active');
   }
   
-  // Start when DOM is ready
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
   } else {
