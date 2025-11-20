@@ -1,6 +1,6 @@
 /*--------------------------------------------------------------
   Awakening Heart : Oracle Opening Sequence
-  Version: 10.2.1 | 2025-11-16
+  Version: 10.3.0 | 2025-11-20
   
   FLOW
 
@@ -19,12 +19,12 @@
      - Stop facet loop
      - Goddess drops + scales down and parks at bottom
      - Metatron shrinks and spins into the center, shader fades
-     - Navigate to CMS scene
+     - Navigate to RANDOM CMS scene using weighted selection
 
 --------------------------------------------------------------*/
 
 document.addEventListener("DOMContentLoaded", () => {
-  console.log("💖 Awakening Heart : Oracle Opening initialized (v10.2.1)");
+  console.log("💖 Awakening Heart : Oracle Opening initialized (v10.3.0)");
 
   // ------- Core DOM -------
   const overlay   = document.getElementById("oracleOverlay") || document.getElementById("overlay");
@@ -81,6 +81,64 @@ document.addEventListener("DOMContentLoaded", () => {
   let divinationStarted  = false;   // has center-click sequence started
   let facetLoopActive    = false;   // is facet loop currently running
   let facetLoopTl        = null;    // GSAP timeline for facets
+
+  // ============================================================
+  // SCENE POOL & RANDOMIZATION
+  // ============================================================
+  
+  /**
+   * Load available scenes from CMS collection list
+   */
+  function loadScenePool() {
+    const items = document.querySelectorAll('.scene-pool-item');
+    const pool = Array.from(items).map(item => {
+      let url = item.dataset.sceneUrl || '';
+      
+      // If URL doesn't start with /, it's just a slug - add /scenes/ prefix
+      if (url && !url.startsWith('/')) {
+        url = '/scenes/' + url;
+      }
+      
+      return {
+        id: item.dataset.sceneId,
+        url: url,
+        weight: parseFloat(item.dataset.sceneWeight) || 1.0,
+        realm: item.dataset.realm
+      };
+    });
+    
+    console.log('🎲 Scene pool loaded:', pool.length, 'scenes');
+    return pool;
+  }
+  
+  /**
+   * Select random scene using weighted randomization (no history on first visit)
+   */
+  function selectRandomScene() {
+    const pool = loadScenePool();
+    
+    if (pool.length === 0) {
+      console.error('❌ No scenes in pool!');
+      return null;
+    }
+    
+    // Calculate total weight
+    const totalWeight = pool.reduce((sum, scene) => sum + scene.weight, 0);
+    
+    // Weighted random selection
+    let random = Math.random() * totalWeight;
+    
+    for (const scene of pool) {
+      random -= scene.weight;
+      if (random <= 0) {
+        console.log('🎯 Entry scene selected:', scene.id, `(weight: ${scene.weight})`);
+        return scene;
+      }
+    }
+    
+    // Fallback
+    return pool[0];
+  }
 
   // ------- Initial states -------
   gsap.set([title], { autoAlpha: 0, clearProps: "transform" });
@@ -366,12 +424,21 @@ document.addEventListener("DOMContentLoaded", () => {
     // Stop facet loop
     stopFacetLoop();
 
+    // Select random scene using weighted selection
+    const nextScene = selectRandomScene();
+    
+    if (!nextScene) {
+      console.error('❌ No scene available for navigation!');
+      // Fallback to hardcoded URL
+      window.location.href = "/scenes/surrender-01";
+      return;
+    }
+
     const divinationTl = gsap.timeline({ 
       defaults: { ease: "sine.inOut" },
       onComplete: () => {
-        console.log("🌀 Divination sequence complete - Navigating to scene");
-        // TODO: update URL as needed or make dynamic
-        window.location.href = "https://awakening-heart.webflow.io/scenes/surrender-01";
+        console.log("🌀 Divination complete - Navigating to:", nextScene.url);
+        window.location.href = nextScene.url;
       }
     });
 
