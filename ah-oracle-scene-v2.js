@@ -41,7 +41,7 @@
     breathDuckAmount: 0.15, // -6dB ducking during breath
     
     // Goddess dock position (meditation mode)
-    goddessDockY: '15vh',
+    goddessDockY: '8vh',
     goddessDockScale: 0.5,
     
     // Meditation mode transition timing
@@ -162,14 +162,23 @@
    */
   function loadScenePool() {
     const items = document.querySelectorAll('.scene-pool-item');
-    const pool = Array.from(items).map(item => ({
-      id: item.dataset.sceneId,
-      url: item.dataset.sceneUrl,
-      weight: parseFloat(item.dataset.sceneWeight) || 1.0,
-      realm: item.dataset.realm
-    }));
+    const pool = Array.from(items).map(item => {
+      let url = item.dataset.sceneUrl || '';
+      
+      // If URL doesn't start with /, it's just a slug - add /scenes/ prefix
+      if (url && !url.startsWith('/')) {
+        url = '/scenes/' + url;
+      }
+      
+      return {
+        id: item.dataset.sceneId,
+        url: url,
+        weight: parseFloat(item.dataset.sceneWeight) || 1.0,
+        realm: item.dataset.realm
+      };
+    });
     
-    console.log('🎲 Scene pool loaded:', pool.length, 'scenes');
+    console.log('🎲 Scene pool loaded:', pool.length, 'scenes', pool);
     return pool;
   }
   
@@ -772,10 +781,9 @@
         onStart: () => console.log('🌀 Metatron returning to top')
       }, 0.3);
       
-      // Instant reposition
+      // Instant reposition (clear Y to let CSS take over)
       tl.set(DOM.metatron, {
-        y: '-30vh', // Back to top position (adjust as needed)
-        x: 0
+        clearProps: 'y,x' // Remove GSAP overrides, use CSS positioning
       });
       
       // Grow at top
@@ -1016,29 +1024,45 @@
   async function handleAudioToggle(e) {
     e.stopPropagation();
     
-    if (!State.backgroundAudio) return;
+    // Determine which audio is currently active
+    const activeAudio = (State.inMeditation && State.meditationAudio && !State.meditationAudio.paused) 
+      ? State.meditationAudio 
+      : State.backgroundAudio;
+    
+    if (!activeAudio) return;
     
     if (window.AHAudioState) {
-      await window.AHAudioState.toggle(State.backgroundAudio, DOM.audioIcon);
+      await window.AHAudioState.toggle(activeAudio, DOM.audioIcon);
     } else {
-      // Fallback toggle
-      const isPlaying = !State.backgroundAudio.paused;
+      // Fallback toggle - handles both audios
+      const isPlaying = !activeAudio.paused;
       
       if (isPlaying) {
-        gsap.to(State.backgroundAudio, {
-          volume: 0,
-          duration: 0.3,
-          onComplete: () => State.backgroundAudio.pause()
-        });
+        // Pause both audios
+        if (State.backgroundAudio) {
+          gsap.to(State.backgroundAudio, {
+            volume: 0,
+            duration: 0.3,
+            onComplete: () => State.backgroundAudio.pause()
+          });
+        }
+        if (State.meditationAudio) {
+          gsap.to(State.meditationAudio, {
+            volume: 0,
+            duration: 0.3,
+            onComplete: () => State.meditationAudio.pause()
+          });
+        }
         if (DOM.audioIcon) {
           gsap.to(DOM.audioIcon, { opacity: 0.4, duration: 0.3 });
         }
       } else {
+        // Play active audio
         try {
-          if (State.backgroundAudio.paused) {
-            await State.backgroundAudio.play();
+          if (activeAudio.paused) {
+            await activeAudio.play();
           }
-          gsap.to(State.backgroundAudio, {
+          gsap.to(activeAudio, {
             volume: CONFIG.audioVolume,
             duration: 0.3
           });
@@ -1082,10 +1106,10 @@
       });
     }
     
-    // Set metatron initial state (at top)
+    // Set metatron initial state (preserve Webflow position)
     if (DOM.metatron) {
+      // Don't override Y position - let Webflow CSS handle it
       gsap.set(DOM.metatron, {
-        y: '0vh',
         scale: 1,
         transformOrigin: '50% 50%',
         force3D: true
@@ -1165,6 +1189,18 @@
     
     // Attach event listeners
     attachEventListeners();
+    
+    // Reveal shader
+    if (window.AHShader && window.AHShader.reveal) {
+      setTimeout(() => {
+        window.AHShader.reveal({ beams: true });
+        console.log('🌀 Shader revealed');
+      }, 300);
+    } else if (DOM.shader) {
+      // Fallback: just show it
+      gsap.to(DOM.shader, { autoAlpha: 1, duration: 1.2, ease: 'sine.inOut' });
+      console.log('🌀 Shader shown (fallback)');
+    }
     
     // Start scene animations if configured
     if (window.metatron && window.AHCONFIG) {
