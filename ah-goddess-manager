@@ -1,0 +1,197 @@
+/*--------------------------------------------------------------
+  Awakening Heart : Goddess Singleton Manager
+  Version: 1.0 | Date: 2025-11-20
+  
+  Ensures only ONE goddess exists and is always clickable.
+  Add this BEFORE ah-oracle-scene-v3.1.js
+--------------------------------------------------------------*/
+
+(function() {
+  'use strict';
+  
+  console.log('🌙 Goddess Singleton Manager loaded');
+  
+  let goddessElement = null;
+  let clickHandlerAttached = false;
+  
+  /**
+   * Remove all goddess elements except the first one
+   */
+  function enforceSingleton() {
+    const goddesses = document.querySelectorAll('#triple-goddess-wrapper');
+    
+    if (goddesses.length === 0) {
+      console.log('⏳ No goddess element found yet');
+      return null;
+    }
+    
+    if (goddesses.length > 1) {
+      console.warn(`⚠️ Found ${goddesses.length} goddess elements, removing duplicates`);
+      
+      // Keep the first one, remove the rest
+      for (let i = 1; i < goddesses.length; i++) {
+        console.log(`🗑️ Removing duplicate goddess #${i + 1}`);
+        goddesses[i].remove();
+      }
+    }
+    
+    goddessElement = goddesses[0];
+    console.log('✅ Goddess singleton enforced');
+    return goddessElement;
+  }
+  
+  /**
+   * Force goddess to be clickable with maximum priority
+   */
+  function makeGoddessClickable(goddess) {
+    if (!goddess) return;
+    
+    // Force inline styles (highest priority)
+    goddess.style.pointerEvents = 'auto';
+    goddess.style.cursor = 'pointer';
+    goddess.style.zIndex = '100'; // Even higher
+    goddess.style.position = 'absolute';
+    
+    // Also set GSAP properties
+    if (window.gsap) {
+      gsap.set(goddess, {
+        pointerEvents: 'auto',
+        cursor: 'pointer',
+        zIndex: 100
+      });
+    }
+    
+    console.log('✅ Goddess forced clickable:', {
+      pointerEvents: goddess.style.pointerEvents,
+      cursor: goddess.style.cursor,
+      zIndex: goddess.style.zIndex
+    });
+  }
+  
+  /**
+   * Attach click handler with debugging
+   */
+  function attachClickHandler(goddess) {
+    if (!goddess || clickHandlerAttached) return;
+    
+    console.log('🔗 Attaching click handler to goddess');
+    
+    // Remove any existing listeners first
+    const newGoddess = goddess.cloneNode(true);
+    goddess.parentNode.replaceChild(newGoddess, goddess);
+    goddessElement = newGoddess;
+    
+    // Attach new listener with debugging
+    newGoddess.addEventListener('click', function(e) {
+      console.log('🌙 GODDESS CLICKED!', {
+        target: e.target,
+        currentTarget: e.currentTarget,
+        x: e.clientX,
+        y: e.clientY
+      });
+      
+      e.stopPropagation();
+      
+      // Visual feedback
+      const fullCircle = newGoddess.querySelector('#full-circle');
+      if (fullCircle && window.gsap) {
+        gsap.to(fullCircle, {
+          scale: 1.2,
+          duration: 0.1,
+          yoyo: true,
+          repeat: 1,
+          transformOrigin: '50% 50%'
+        });
+      }
+      
+      // Notify scene controller if available
+      if (window.AHSceneController && window.AHSceneController.handleGoddessClick) {
+        window.AHSceneController.handleGoddessClick(e);
+      } else {
+        console.warn('⚠️ Scene controller not found, can\'t toggle meditation');
+      }
+    }, { capture: true }); // Use capture phase
+    
+    // Also attach to SVG element inside
+    const svg = newGoddess.querySelector('#triple-goddess');
+    if (svg) {
+      svg.style.pointerEvents = 'auto';
+      svg.style.cursor = 'pointer';
+    }
+    
+    clickHandlerAttached = true;
+    console.log('✅ Click handler attached');
+  }
+  
+  /**
+   * Initialize goddess singleton
+   */
+  function init() {
+    console.log('🌙 Initializing Goddess Singleton Manager');
+    
+    // Enforce singleton
+    const goddess = enforceSingleton();
+    
+    if (goddess) {
+      makeGoddessClickable(goddess);
+      attachClickHandler(goddess);
+    }
+    
+    // Watch for new goddess elements being added
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        mutation.addedNodes.forEach((node) => {
+          if (node.nodeType === 1) { // Element node
+            if (node.id === 'triple-goddess-wrapper' || 
+                node.querySelector && node.querySelector('#triple-goddess-wrapper')) {
+              console.log('🚨 New goddess element detected by MutationObserver!');
+              
+              // Re-enforce singleton
+              setTimeout(() => {
+                const goddess = enforceSingleton();
+                if (goddess) {
+                  makeGoddessClickable(goddess);
+                  if (!clickHandlerAttached) {
+                    attachClickHandler(goddess);
+                  }
+                }
+              }, 100);
+            }
+          }
+        });
+      });
+    });
+    
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+    
+    console.log('✅ MutationObserver watching for goddess duplicates');
+  }
+  
+  // Initialize immediately if DOM ready, otherwise wait
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+  
+  // Re-run after a delay to catch any late additions
+  setTimeout(init, 500);
+  setTimeout(init, 1000);
+  setTimeout(init, 2000);
+  
+  // Expose for manual control
+  window.GoddessManager = {
+    enforceSingleton,
+    makeGoddessClickable,
+    attachClickHandler,
+    init,
+    getGoddess: () => goddessElement
+  };
+  
+  console.log('✅ Goddess Singleton Manager ready');
+  console.log('💡 Manual controls: GoddessManager.init(), GoddessManager.enforceSingleton()');
+  
+})();
