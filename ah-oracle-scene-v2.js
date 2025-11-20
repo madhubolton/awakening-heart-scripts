@@ -41,7 +41,7 @@
     breathDuckAmount: 0.15, // -6dB ducking during breath
     
     // Goddess dock position (meditation mode)
-    goddessDockY: '45vh',
+    goddessDockY: '15vh',
     goddessDockScale: 0.5,
     
     // Meditation mode transition timing
@@ -1085,7 +1085,7 @@
     // Set metatron initial state (at top)
     if (DOM.metatron) {
       gsap.set(DOM.metatron, {
-        y: '-30vh',
+        y: '0vh',
         scale: 1,
         transformOrigin: '50% 50%',
         force3D: true
