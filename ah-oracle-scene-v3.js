@@ -1130,5 +1130,21 @@
   } else {
     init();
   }
+  
+  // ============================================================
+  // PUBLIC API
+  // ============================================================
+  
+  // Expose for external control (e.g., Goddess Manager)
+  window.AHSceneController = {
+    handleGoddessClick,
+    handleCenterClick,
+    enterMeditationMode,
+    exitMeditationMode,
+    getState: () => State,
+    getDOM: () => DOM
+  };
+  
+  console.log('✅ Scene controller API exposed');
 
 })();
