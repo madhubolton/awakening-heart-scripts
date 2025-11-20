@@ -41,7 +41,7 @@
     breathDuckAmount: 0.15, // -6dB ducking during breath
     
     // Goddess dock position (meditation mode)
-    goddessDockY: '1vh',
+    goddessDockY: '45vh',
     goddessDockScale: 0.5,
     
     // Meditation mode transition timing
