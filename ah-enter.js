@@ -1,6 +1,6 @@
 /*--------------------------------------------------------------
   Awakening Heart : Oracle Opening Sequence
-  Version: 10.4.0 | 2025-11-21
+  Version: 10.4.1 | 2025-11-21
   
   FLOW
 
@@ -24,10 +24,13 @@
   CHANGES in v10.4.0:
   - Goddess now glides in gracefully like Guild Navigators (Dune)
   - Scene randomizer now excludes opening/entry scene from selection
+  
+  CHANGES in v10.4.1:
+  - Added audio fade at 30% of Metatron divination animation for smooth transitions
 --------------------------------------------------------------*/
 
 document.addEventListener("DOMContentLoaded", () => {
-  console.log("💖 Awakening Heart : Oracle Opening initialized (v10.4.0)");
+  console.log("💖 Awakening Heart : Oracle Opening initialized (v10.4.1)");
 
   // ------- Core DOM -------
   const overlay   = document.getElementById("oracleOverlay") || document.getElementById("overlay");
@@ -534,6 +537,16 @@ document.addEventListener("DOMContentLoaded", () => {
           console.log("✅ Metatron shrunk to center");
         }
       }, "-=0.4");
+      
+      // Fade audio when Metatron reaches ~30% of animation (0.78s into 2.6s)
+      if (bg) {
+        divinationTl.to(bg, {
+          volume: 0,
+          duration: 1.0,
+          ease: "power2.in",
+          onStart: () => console.log("🔇 Fading audio for smooth transition")
+        }, "-=1.82"); // Positions fade to start 0.78s into Metatron animation (~30%)
+      }
     }
 
     // 4) Fade out inner Metatron shapes a bit after shrink starts
