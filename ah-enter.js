@@ -1,6 +1,6 @@
 /*--------------------------------------------------------------
   Awakening Heart : Oracle Opening Sequence
-  Version: 10.3.0 | 2025-11-20
+  Version: 10.4.0 | 2025-11-21
   
   FLOW
 
@@ -11,7 +11,7 @@
      - Overlay fades, temple dissolves, Metatron scales up
      - Shader reveals
      - Audio starts
-     - Goddess becomes visible in original glyph position
+     - Goddess glides in gracefully from above
      - Facet animation starts and loops continuously
      - Metatron center becomes clickable (pulsing)
 
@@ -19,12 +19,15 @@
      - Stop facet loop
      - Goddess drops + scales down and parks at bottom
      - Metatron shrinks and spins into the center, shader fades
-     - Navigate to RANDOM CMS scene using weighted selection
+     - Navigate to RANDOM CMS scene using weighted selection (excludes opening scene)
 
+  CHANGES in v10.4.0:
+  - Goddess now glides in gracefully like Guild Navigators (Dune)
+  - Scene randomizer now excludes opening/entry scene from selection
 --------------------------------------------------------------*/
 
 document.addEventListener("DOMContentLoaded", () => {
-  console.log("💖 Awakening Heart : Oracle Opening initialized (v10.3.0)");
+  console.log("💖 Awakening Heart : Oracle Opening initialized (v10.4.0)");
 
   // ------- Core DOM -------
   const overlay   = document.getElementById("oracleOverlay") || document.getElementById("overlay");
@@ -87,6 +90,16 @@ document.addEventListener("DOMContentLoaded", () => {
   // ============================================================
   
   /**
+   * Determine if we're currently on the opening/entry scene
+   * The opening scene is typically at root or has no /scenes/ path
+   */
+  function isOpeningScene() {
+    const path = window.location.pathname;
+    // Opening scene doesn't have /scenes/ in path
+    return !path.includes('/scenes/');
+  }
+  
+  /**
    * Load available scenes from CMS collection list
    */
   function loadScenePool() {
@@ -112,7 +125,8 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   
   /**
-   * Select random scene using weighted randomization (no history on first visit)
+   * Select random scene using weighted randomization
+   * CRITICAL: Excludes opening scene - only selects from actual oracle scenes
    */
   function selectRandomScene() {
     const pool = loadScenePool();
@@ -122,22 +136,35 @@ document.addEventListener("DOMContentLoaded", () => {
       return null;
     }
     
-    // Calculate total weight
-    const totalWeight = pool.reduce((sum, scene) => sum + scene.weight, 0);
+    // Filter out any scenes that don't have proper /scenes/ URLs
+    // This prevents selecting the opening scene
+    const validScenes = pool.filter(scene => {
+      return scene.url && scene.url.startsWith('/scenes/') && scene.id;
+    });
+    
+    if (validScenes.length === 0) {
+      console.error('❌ No valid oracle scenes available!');
+      return null;
+    }
+    
+    // Calculate total weight from valid scenes only
+    const totalWeight = validScenes.reduce((sum, scene) => sum + scene.weight, 0);
     
     // Weighted random selection
     let random = Math.random() * totalWeight;
     
-    for (const scene of pool) {
+    for (const scene of validScenes) {
       random -= scene.weight;
       if (random <= 0) {
         console.log('🎯 Entry scene selected:', scene.id, `(weight: ${scene.weight})`);
+        console.log('📍 Navigating to:', scene.url);
         return scene;
       }
     }
     
-    // Fallback
-    return pool[0];
+    // Fallback to first valid scene
+    console.log('🎯 Fallback to first valid scene:', validScenes[0].id);
+    return validScenes[0];
   }
 
   // ------- Initial states -------
@@ -151,8 +178,8 @@ document.addEventListener("DOMContentLoaded", () => {
     gsap.set(goddess, {
       autoAlpha: 0,
       pointerEvents: "none",
-      y: 0,
-      scale: 1,
+      y: "-15vh",    // Start from above for gliding entrance
+      scale: 0.85,
       transformOrigin: "50% 50%"
     });
   }
@@ -335,18 +362,26 @@ document.addEventListener("DOMContentLoaded", () => {
       );
     }
 
-    // Reveal Goddess in original glyph position AFTER entry click
+    // Goddess glides in gracefully (like Guild Navigators in Dune)
     if (goddess) {
-      clickTl.set(
+      clickTl.fromTo(
         goddess,
         {
-          autoAlpha: 1,
-          pointerEvents: "none", // not clickable yet
-          y: 0,
-          scale: 1,
+          autoAlpha: 0,
+          y: "-15vh",  // Start from above
+          scale: 0.85,
           transformOrigin: "50% 50%"
         },
-        ">-0.4" // slight overlap with Metatron zoom
+        {
+          autoAlpha: 1,
+          y: 0,
+          scale: 1,
+          duration: 1.8,
+          ease: "power1.inOut",
+          pointerEvents: "none",  // not clickable yet
+          onStart: () => console.log("🌙 Goddess gliding into position")
+        },
+        ">-0.6" // overlap with Metatron zoom for smooth flow
       );
     }
 
@@ -424,12 +459,12 @@ document.addEventListener("DOMContentLoaded", () => {
     // Stop facet loop
     stopFacetLoop();
 
-    // Select random scene using weighted selection
+    // Select random scene using weighted selection (excludes opening)
     const nextScene = selectRandomScene();
     
     if (!nextScene) {
       console.error('❌ No scene available for navigation!');
-      // Fallback to hardcoded URL
+      // Fallback to hardcoded URL (ensure it's NOT the opening)
       window.location.href = "/scenes/surrender-01";
       return;
     }
