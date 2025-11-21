@@ -1,6 +1,6 @@
 /*--------------------------------------------------------------
   Awakening Heart : Oracle Opening Sequence
-  Version: 10.4.1 | 2025-11-21
+  Version: 10.4.2 | 2025-11-21
   
   FLOW
 
@@ -27,10 +27,13 @@
   
   CHANGES in v10.4.1:
   - Added audio fade at 30% of Metatron divination animation for smooth transitions
+  
+  CHANGES in v10.4.2:
+  - Added shader fade at 30% of Metatron animation, synchronized with audio fade
 --------------------------------------------------------------*/
 
 document.addEventListener("DOMContentLoaded", () => {
-  console.log("💖 Awakening Heart : Oracle Opening initialized (v10.4.1)");
+  console.log("💖 Awakening Heart : Oracle Opening initialized (v10.4.2)");
 
   // ------- Core DOM -------
   const overlay   = document.getElementById("oracleOverlay") || document.getElementById("overlay");
@@ -188,7 +191,18 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   gsap.set([overlay, temple], { autoAlpha: 1 });
-  gsap.set(metatron,  { transformOrigin: "50% 50%", force3D: true });
+  
+  // Metatron visible at normal size (overrides synchronous hiding script)
+  if (metatron) {
+    gsap.set(metatron, { 
+      autoAlpha: 1,              // Visible
+      scale: 1,                  // Normal size
+      opacity: 1,                // Explicit opacity
+      visibility: "visible",      // Override inline hiding
+      transformOrigin: "50% 50%", 
+      force3D: true 
+    });
+  }
   
   // Icon: dark/off state initially
   if (icon) gsap.set(icon, { opacity: 0.4 });
@@ -521,18 +535,6 @@ document.addEventListener("DOMContentLoaded", () => {
         onStart: () => {
           console.log("🌀 Metatron shrinking and spinning to center");
         },
-        onUpdate: function() {
-          const s = gsap.getProperty(metatron, "scale");
-          if (shaderW && s <= 0.4 && gsap.getProperty(shaderW, "opacity") > 0) {
-            console.log("💫 Triggering shader dissolve at Metatron scale:", s);
-            gsap.to(shaderW, {
-              autoAlpha: 0,
-              duration: 1.4,
-              ease: "power2.in",
-              overwrite: true
-            });
-          }
-        },
         onComplete: () => {
           console.log("✅ Metatron shrunk to center");
         }
@@ -546,6 +548,16 @@ document.addEventListener("DOMContentLoaded", () => {
           ease: "power2.in",
           onStart: () => console.log("🔇 Fading audio for smooth transition")
         }, "-=1.82"); // Positions fade to start 0.78s into Metatron animation (~30%)
+      }
+      
+      // Fade shader at same timing as audio (30% of Metatron animation)
+      if (shaderW) {
+        divinationTl.to(shaderW, {
+          autoAlpha: 0,
+          duration: 1.4,
+          ease: "power2.in",
+          onStart: () => console.log("💫 Fading shader for smooth transition")
+        }, "-=1.82"); // Same timing as audio fade
       }
     }
 
