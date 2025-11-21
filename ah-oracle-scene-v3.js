@@ -1,8 +1,11 @@
 /*--------------------------------------------------------------
-  Awakening Heart : Oracle Scene Controller v3.1
-  Version: 3.1.0 | Date: 2025-11-20
+  Awakening Heart : Oracle Scene Controller v3.1.1
+  Version: 3.1.1 | Date: 2025-11-21
   
-  FIXES:
+  FIXES in v3.1.1:
+  - Fixed Metatron visibility in entry animation (overrides inline hiding)
+  
+  FIXES in v3.1.0:
   - Resolved duplicate goddess rendering
   - Fixed clickability issues (goddess, center)
   - Fixed cursor disappearing over Metatron
@@ -371,6 +374,7 @@
           scale: 0.01,
           rotation: 0,
           opacity: 0,
+          visibility: 'hidden',
           transformOrigin: '50% 50%',
           force3D: true
         },
@@ -378,6 +382,7 @@
           scale: CONFIG.metatronScale,
           rotation: -720,
           opacity: 1.0,
+          visibility: 'visible',  // ← CRITICAL: Override inline visibility: hidden
           duration: CONFIG.metatronSpiralDuration,
           ease: 'power2.out',
           onStart: () => console.log('🌀 Metatron spiraling up')
@@ -1031,6 +1036,7 @@
     }
     
     // Metatron tiny at center (ready to spiral up)
+    // NOTE: Inline styles from synchronous hiding script will be overridden by animation
     if (DOM.metatron) {
       gsap.set(DOM.metatron, {
         y: 0,
@@ -1102,7 +1108,7 @@
   }
   
   async function init() {
-    console.log('💖 Oracle Scene Controller v3.1 initializing...');
+    console.log('💖 Oracle Scene Controller v3.1.1 initializing...');
     
     cacheDOM();
     setupInitialState();
