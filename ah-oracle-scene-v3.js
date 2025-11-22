@@ -1,16 +1,17 @@
 /*--------------------------------------------------------------
-  Awakening Heart : Oracle Scene Controller v3.1.2
-  Version: 3.1.2 | Date: 2025-11-21
+  Awakening Heart : Oracle Scene Controller v3.1.3
+  Version: 3.1.3 | Date: 2025-11-21
+  
+  FIXES in v3.1.3:
+  - CRITICAL: Removed pointer-events blocking from parent SVG (was preventing P_C clicks)
+  - Improved Metatron spiral easing (expo.out for "approaching from space" feel)
+  - Adjusted Goddess dock position (18vh instead of 20vh for better visual balance)
   
   FIXES in v3.1.2:
   - Fixed Metatron appearing from distance (0.001 scale + y-offset)
   - Fixed Goddess smooth fade-in on scene entry
   - Fixed Goddess clickability (shader pointer-events issue)
   - Fixed Metatron center clickability and cursor in meditation mode
-  - Changed Metatron cursor from 'default' to 'auto' to allow children cursors
-  
-  FIXES in v3.1.1:
-  - Fixed Metatron visibility in entry animation (overrides inline hiding)
   
   COMPLETE CYCLICAL FLOW:
   Entry Scene → Divination → New Scene Entry → Content Navigation → 
@@ -39,7 +40,7 @@
     breathDuckAmount: 0.15,
     
     // Goddess positions and scales
-    goddessDockY: '20vh',
+    goddessDockY: '18vh',  // Moved up for better visual balance (~20px equivalent)
     goddessDockScale: 0.5,
     goddessCenterY: 0,
     goddessCenterScale: 1.0,
@@ -387,7 +388,7 @@
           opacity: 1.0,
           visibility: 'visible',
           duration: CONFIG.metatronSpiralDuration,
-          ease: 'power2.out',
+          ease: 'expo.out',  // Dramatic "approaching from distant space" feel
           onStart: () => console.log('🌀 Metatron spiraling up from distance')
         },
         0
@@ -1054,6 +1055,7 @@
     }
     
     // Metatron tiny at distant center (ready to spiral up)
+    // CRITICAL: No pointer-events on parent SVG - let children control their own
     if (DOM.metatron) {
       gsap.set(DOM.metatron, {
         y: '5vh',  // Start below center for depth effect
@@ -1062,21 +1064,25 @@
         opacity: 0,
         rotation: 0,
         transformOrigin: '50% 50%',
-        force3D: true,
-        cursor: 'auto',  // Changed from 'default' to allow children cursors (P_C)
-        pointerEvents: 'none'  // Parent blocks clicks, but children can override
+        force3D: true
+        // NO pointerEvents here - parent must not block children!
       });
       
-      // Ensure Metatron shapes don't block interaction (except center)
+      // Disable pointer events on all shapes EXCEPT P_C (center must be clickable later)
       const metatronShapes = DOM.metatron.querySelectorAll('polygon, polyline, path, circle');
       metatronShapes.forEach(shape => {
-        // Don't disable pointer events on center - it needs to be clickable
         if (shape.id !== 'P_C') {
           gsap.set(shape, { pointerEvents: 'none' });
+        } else {
+          // P_C starts disabled but can be enabled by enableCenterDivination()
+          gsap.set(shape, { 
+            pointerEvents: 'none',
+            cursor: 'pointer'  // Ready for when it's enabled
+          });
         }
       });
       
-      console.log('🌀 Metatron initialized at tiny distant center');
+      console.log('🌀 Metatron initialized at tiny distant center (P_C preserved for later)');
     }
     
     // Title hidden
@@ -1089,15 +1095,6 @@
       gsap.set(DOM.shader, { 
         autoAlpha: 0,
         pointerEvents: 'none'  // Ensures clicks pass through to goddess below
-      });
-    }
-    
-    // Center disabled initially, but cursor ready
-    if (DOM.metatronCenter) {
-      gsap.set(DOM.metatronCenter, {
-        pointerEvents: 'none',
-        opacity: 0,
-        cursor: 'pointer'  // Set now so it's ready when enabled
       });
     }
     
