@@ -1,16 +1,16 @@
 /*--------------------------------------------------------------
-  Awakening Heart : Oracle Scene Controller v3.1.1
-  Version: 3.1.1 | Date: 2025-11-21
+  Awakening Heart : Oracle Scene Controller v3.1.2
+  Version: 3.1.2 | Date: 2025-11-21
+  
+  FIXES in v3.1.2:
+  - Fixed Metatron appearing from distance (0.001 scale + y-offset)
+  - Fixed Goddess smooth fade-in on scene entry
+  - Fixed Goddess clickability (shader pointer-events issue)
+  - Fixed Metatron center clickability and cursor in meditation mode
+  - Changed Metatron cursor from 'default' to 'auto' to allow children cursors
   
   FIXES in v3.1.1:
   - Fixed Metatron visibility in entry animation (overrides inline hiding)
-  
-  FIXES in v3.1.0:
-  - Resolved duplicate goddess rendering
-  - Fixed clickability issues (goddess, center)
-  - Fixed cursor disappearing over Metatron
-  - Eliminated flash on load
-  - Improved z-index management
   
   COMPLETE CYCLICAL FLOW:
   Entry Scene → Divination → New Scene Entry → Content Navigation → 
@@ -51,7 +51,8 @@
     
     // Scene entry animation timing
     sceneEntryDuration: 2.0,
-    metatronSpiralDuration: 1.6,
+    metatronSpiralDuration: 1.8,  // Slightly longer for dramatic effect
+    goddessFadeDuration: 0.6,     // Quick but smooth fade
     
     // Meditation mode transition timing
     meditationTransitionDuration: 1.4,
@@ -367,11 +368,12 @@
       }
     });
     
-    // Metatron spirals UP from tiny center
+    // Metatron spirals UP from tiny distant center
     if (DOM.metatron) {
       tl.fromTo(DOM.metatron,
         {
-          scale: 0.01,
+          y: '5vh',  // Start below center for depth
+          scale: 0.001,  // Much smaller for dramatic effect
           rotation: 0,
           opacity: 0,
           visibility: 'hidden',
@@ -379,13 +381,14 @@
           force3D: true
         },
         {
+          y: 0,  // Rise to true center
           scale: CONFIG.metatronScale,
           rotation: -720,
           opacity: 1.0,
-          visibility: 'visible',  // ← CRITICAL: Override inline visibility: hidden
+          visibility: 'visible',
           duration: CONFIG.metatronSpiralDuration,
           ease: 'power2.out',
-          onStart: () => console.log('🌀 Metatron spiraling up')
+          onStart: () => console.log('🌀 Metatron spiraling up from distance')
         },
         0
       );
@@ -399,6 +402,20 @@
           autoAlpha: 1,
           duration: 1.2,
           ease: 'sine.inOut'
+        },
+        '-=1.2'
+      );
+    }
+    
+    // Goddess fades IN quickly and smoothly
+    if (DOM.goddess) {
+      tl.fromTo(DOM.goddess,
+        { opacity: 0 },
+        {
+          opacity: 1,
+          duration: CONFIG.goddessFadeDuration,
+          ease: 'sine.inOut',
+          onStart: () => console.log('🌙 Goddess fading in')
         },
         '-=1.0'
       );
@@ -1021,42 +1038,45 @@
       }
     });
     
-    // Goddess at dock (matches entry scene end)
+    // Goddess at dock (matches entry scene end) but invisible for smooth fade-in
     if (DOM.goddess) {
       gsap.set(DOM.goddess, {
         y: CONFIG.goddessDockY,
         scale: CONFIG.goddessDockScale,
-        autoAlpha: 1,
+        opacity: 0,  // Start invisible for smooth fade-in
+        visibility: 'visible',
         cursor: 'pointer',
         pointerEvents: 'auto',
         transformOrigin: '50% 50%',
         zIndex: 50
       });
-      console.log('🌙 Goddess initialized at dock position');
+      console.log('🌙 Goddess initialized at dock position (invisible, ready for fade-in)');
     }
     
-    // Metatron tiny at center (ready to spiral up)
-    // NOTE: Inline styles from synchronous hiding script will be overridden by animation
+    // Metatron tiny at distant center (ready to spiral up)
     if (DOM.metatron) {
       gsap.set(DOM.metatron, {
-        y: 0,
+        y: '5vh',  // Start below center for depth effect
         x: 0,
-        scale: 0.01,
+        scale: 0.001,  // Much smaller for dramatic "from distance" effect
         opacity: 0,
         rotation: 0,
         transformOrigin: '50% 50%',
         force3D: true,
-        cursor: 'default',
-        pointerEvents: 'none'
+        cursor: 'auto',  // Changed from 'default' to allow children cursors (P_C)
+        pointerEvents: 'none'  // Parent blocks clicks, but children can override
       });
       
-      // Ensure Metatron shapes don't block interaction
+      // Ensure Metatron shapes don't block interaction (except center)
       const metatronShapes = DOM.metatron.querySelectorAll('polygon, polyline, path, circle');
       metatronShapes.forEach(shape => {
-        gsap.set(shape, { pointerEvents: 'none' });
+        // Don't disable pointer events on center - it needs to be clickable
+        if (shape.id !== 'P_C') {
+          gsap.set(shape, { pointerEvents: 'none' });
+        }
       });
       
-      console.log('🌀 Metatron initialized at tiny center');
+      console.log('🌀 Metatron initialized at tiny distant center');
     }
     
     // Title hidden
@@ -1064,19 +1084,20 @@
       gsap.set(DOM.title, { autoAlpha: 0, scale: 0 });
     }
     
-    // Shader hidden
+    // Shader hidden - CRITICAL: pointer-events none so goddess remains clickable
     if (DOM.shader) {
       gsap.set(DOM.shader, { 
         autoAlpha: 0,
-        pointerEvents: 'none'
+        pointerEvents: 'none'  // Ensures clicks pass through to goddess below
       });
     }
     
-    // Center disabled
+    // Center disabled initially, but cursor ready
     if (DOM.metatronCenter) {
       gsap.set(DOM.metatronCenter, {
         pointerEvents: 'none',
-        opacity: 0
+        opacity: 0,
+        cursor: 'pointer'  // Set now so it's ready when enabled
       });
     }
     
@@ -1108,7 +1129,7 @@
   }
   
   async function init() {
-    console.log('💖 Oracle Scene Controller v3.1.1 initializing...');
+    console.log('💖 Oracle Scene Controller v3.1.2 initializing...');
     
     cacheDOM();
     setupInitialState();
@@ -1141,7 +1162,6 @@
   // PUBLIC API
   // ============================================================
   
-  // Expose for external control (e.g., Goddess Manager)
   window.AHSceneController = {
     handleGoddessClick,
     handleCenterClick,
