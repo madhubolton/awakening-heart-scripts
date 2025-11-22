@@ -385,7 +385,7 @@ document.addEventListener("DOMContentLoaded", () => {
         goddess,
         {
           autoAlpha: 0,
-          y: "-15vh",  // Start from above
+          y: "-16vh",  // Start from above
           scale: 0.85,
           transformOrigin: "50% 50%"
         },
