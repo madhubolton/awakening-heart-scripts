@@ -40,7 +40,7 @@
     breathDuckAmount: 0.15,
     
     // Goddess positions and scales
-    goddessDockY: '18vh',  // Moved up for better visual balance (~20px equivalent)
+    goddessDockY: '10vh',  // Moved up for better visual balance (~20px equivalent)
     goddessDockScale: 0.5,
     goddessCenterY: 0,
     goddessCenterScale: 1.0,
