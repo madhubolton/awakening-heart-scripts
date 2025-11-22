@@ -51,8 +51,8 @@
     metatronScale: 1.25,
     
     // Scene entry animation timing
-    sceneEntryDuration: 4.5,
-    metatronSpiralDuration: 3.5,  // Slightly longer for dramatic effect
+    sceneEntryDuration: 2.0,
+    metatronSpiralDuration: 1.8,  // Slightly longer for dramatic effect
     goddessFadeDuration: 0.6,     // Quick but smooth fade
     
     // Meditation mode transition timing
@@ -755,6 +755,15 @@
       opacity: 0.8
     });
     
+    console.log('🔍 DEBUG: P_C after enable - pointer-events:', 
+      window.getComputedStyle(DOM.metatronCenter).pointerEvents,
+      'cursor:', window.getComputedStyle(DOM.metatronCenter).cursor,
+      'opacity:', window.getComputedStyle(DOM.metatronCenter).opacity,
+      'z-index:', window.getComputedStyle(DOM.metatronCenter).zIndex);
+    
+    console.log('🔍 DEBUG: Metatron parent pointer-events:', 
+      window.getComputedStyle(DOM.metatron).pointerEvents);
+    
     gsap.to(DOM.metatronCenter, {
       opacity: 1,
       scale: 1.05,
@@ -918,9 +927,19 @@
   }
   
   function handleGoddessClick(e) {
+    console.log('🔍 DEBUG: Goddess click event fired!', {
+      target: e.target,
+      currentTarget: e.currentTarget,
+      sceneEntryComplete: State.sceneEntryComplete,
+      inMeditation: State.inMeditation
+    });
+    
     e.stopPropagation();
     
-    if (!State.sceneEntryComplete) return;
+    if (!State.sceneEntryComplete) {
+      console.log('⏸️ Click ignored - scene entry not complete');
+      return;
+    }
     
     console.log('🌙 Goddess clicked');
     playSfx(DOM.goddessClickSfx);
@@ -938,18 +957,34 @@
     }
     
     if (State.inMeditation) {
+      console.log('📖 Exiting meditation mode');
       exitMeditationMode();
     } else {
+      console.log('🧘 Entering meditation mode');
       enterMeditationMode();
     }
   }
   
   function handleCenterClick(e) {
+    console.log('🔍 DEBUG: Center click event fired!', {
+      target: e.target,
+      currentTarget: e.currentTarget,
+      inMeditation: State.inMeditation,
+      sceneEntryComplete: State.sceneEntryComplete,
+      pointerEvents: window.getComputedStyle(e.currentTarget).pointerEvents
+    });
+    
     e.stopPropagation();
     
-    if (!State.inMeditation || !State.sceneEntryComplete) return;
+    if (!State.inMeditation || !State.sceneEntryComplete) {
+      console.log('⏸️ Center click ignored:', {
+        inMeditation: State.inMeditation,
+        sceneEntryComplete: State.sceneEntryComplete
+      });
+      return;
+    }
     
-    console.log('🎯 Center clicked');
+    console.log('🎯 Center clicked - triggering divination');
     playSfx(DOM.centerClickSfx);
     
     triggerDivination();
@@ -1052,6 +1087,10 @@
         zIndex: 50
       });
       console.log('🌙 Goddess initialized at dock position (invisible, ready for fade-in)');
+      console.log('🔍 DEBUG: Goddess pointer-events:', 
+        window.getComputedStyle(DOM.goddess).pointerEvents,
+        'z-index:', window.getComputedStyle(DOM.goddess).zIndex,
+        'cursor:', window.getComputedStyle(DOM.goddess).cursor);
     }
     
     // Metatron tiny at distant center (ready to spiral up)
@@ -1068,6 +1107,9 @@
         // NO pointerEvents here - parent must not block children!
       });
       
+      console.log('🔍 DEBUG: Metatron parent pointer-events:', 
+        window.getComputedStyle(DOM.metatron).pointerEvents);
+      
       // Disable pointer events on all shapes EXCEPT P_C (center must be clickable later)
       const metatronShapes = DOM.metatron.querySelectorAll('polygon, polyline, path, circle');
       metatronShapes.forEach(shape => {
@@ -1079,6 +1121,8 @@
             pointerEvents: 'none',
             cursor: 'pointer'  // Ready for when it's enabled
           });
+          console.log('🔍 DEBUG: P_C initial pointer-events:', 
+            window.getComputedStyle(shape).pointerEvents);
         }
       });
       
@@ -1106,18 +1150,32 @@
   function attachEventListeners() {
     console.log('🔗 Attaching event listeners');
     
+    // DEBUG: Global click listener to see if clicks work at all
+    document.addEventListener('click', (e) => {
+      console.log('🔍 DEBUG: Global click detected at:', e.clientX, e.clientY, 'target:', e.target);
+    });
+    
     window.addEventListener('wheel', handleWheel, { passive: false });
     window.addEventListener('touchstart', handleTouchStart, { passive: true });
     window.addEventListener('touchend', handleTouchEnd, { passive: true });
     
     if (DOM.goddess) {
       DOM.goddess.addEventListener('click', handleGoddessClick);
-      console.log('✅ Goddess click handler attached');
+      console.log('✅ Goddess click handler attached to:', DOM.goddess);
+      console.log('🔍 DEBUG: Goddess pointer-events:', 
+        window.getComputedStyle(DOM.goddess).pointerEvents,
+        'z-index:', window.getComputedStyle(DOM.goddess).zIndex);
+    } else {
+      console.warn('⚠️ Goddess element not found - cannot attach click handler');
     }
     
     if (DOM.metatronCenter) {
       DOM.metatronCenter.addEventListener('click', handleCenterClick);
-      console.log('✅ Center click handler attached');
+      console.log('✅ Center click handler attached to:', DOM.metatronCenter);
+      console.log('🔍 DEBUG: P_C pointer-events:', 
+        window.getComputedStyle(DOM.metatronCenter).pointerEvents);
+    } else {
+      console.warn('⚠️ Metatron center (P_C) not found - cannot attach click handler');
     }
     
     if (DOM.audioToggle) {
