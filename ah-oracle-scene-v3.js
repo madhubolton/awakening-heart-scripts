@@ -749,9 +749,12 @@
     
     console.log('🎯 Center divination enabled');
     
+    // Use direct DOM manipulation for pointer-events (GSAP has issues with SVG)
+    DOM.metatronCenter.style.pointerEvents = 'auto';
+    DOM.metatronCenter.style.cursor = 'pointer';
+    
+    // Use GSAP for visual properties
     gsap.set(DOM.metatronCenter, {
-      cursor: 'pointer',
-      pointerEvents: 'auto',
       opacity: 0.8
     });
     
@@ -759,7 +762,7 @@
       window.getComputedStyle(DOM.metatronCenter).pointerEvents,
       'cursor:', window.getComputedStyle(DOM.metatronCenter).cursor,
       'opacity:', window.getComputedStyle(DOM.metatronCenter).opacity,
-      'z-index:', window.getComputedStyle(DOM.metatronCenter).zIndex);
+      'inline style pointer-events:', DOM.metatronCenter.style.pointerEvents);
     
     console.log('🔍 DEBUG: Metatron parent pointer-events:', 
       window.getComputedStyle(DOM.metatron).pointerEvents);
@@ -1086,11 +1089,17 @@
         transformOrigin: '50% 50%',
         zIndex: 50
       });
+      
+      // Backup: Force pointer-events via direct DOM (GSAP sometimes fails on divs too)
+      DOM.goddess.style.pointerEvents = 'auto';
+      DOM.goddess.style.cursor = 'pointer';
+      
       console.log('🌙 Goddess initialized at dock position (invisible, ready for fade-in)');
       console.log('🔍 DEBUG: Goddess pointer-events:', 
         window.getComputedStyle(DOM.goddess).pointerEvents,
         'z-index:', window.getComputedStyle(DOM.goddess).zIndex,
-        'cursor:', window.getComputedStyle(DOM.goddess).cursor);
+        'cursor:', window.getComputedStyle(DOM.goddess).cursor,
+        'inline style pointer-events:', DOM.goddess.style.pointerEvents);
     }
     
     // Metatron tiny at distant center (ready to spiral up)
@@ -1110,23 +1119,23 @@
       console.log('🔍 DEBUG: Metatron parent pointer-events:', 
         window.getComputedStyle(DOM.metatron).pointerEvents);
       
-      // Disable pointer events on all shapes EXCEPT P_C (center must be clickable later)
+      // Disable pointer events on all shapes EXCEPT P_C
+      // P_C is left completely untouched - just like entry scene!
       const metatronShapes = DOM.metatron.querySelectorAll('polygon, polyline, path, circle');
       metatronShapes.forEach(shape => {
         if (shape.id !== 'P_C') {
           gsap.set(shape, { pointerEvents: 'none' });
-        } else {
-          // P_C starts disabled but can be enabled by enableCenterDivination()
-          gsap.set(shape, { 
-            pointerEvents: 'none',
-            cursor: 'pointer'  // Ready for when it's enabled
-          });
-          console.log('🔍 DEBUG: P_C initial pointer-events:', 
-            window.getComputedStyle(shape).pointerEvents);
         }
+        // P_C: Don't touch it at all! It will be enabled by enableCenterDivination()
       });
       
-      console.log('🌀 Metatron initialized at tiny distant center (P_C preserved for later)');
+      if (DOM.metatronCenter) {
+        console.log('🔍 DEBUG: P_C initial (untouched) pointer-events:', 
+          window.getComputedStyle(DOM.metatronCenter).pointerEvents,
+          'has inline style:', DOM.metatronCenter.style.pointerEvents || 'none');
+      }
+      
+      console.log('🌀 Metatron initialized at tiny distant center (P_C untouched)');
     }
     
     // Title hidden
@@ -1152,7 +1161,12 @@
     
     // DEBUG: Global click listener to see if clicks work at all
     document.addEventListener('click', (e) => {
-      console.log('🔍 DEBUG: Global click detected at:', e.clientX, e.clientY, 'target:', e.target);
+      const elementAtPoint = document.elementFromPoint(e.clientX, e.clientY);
+      console.log('🔍 DEBUG: Global click detected at:', e.clientX, e.clientY, 
+        'target:', e.target,
+        'elementAtPoint:', elementAtPoint,
+        'elementAtPoint id:', elementAtPoint?.id || 'no-id',
+        'elementAtPoint pointer-events:', elementAtPoint ? window.getComputedStyle(elementAtPoint).pointerEvents : 'N/A');
     });
     
     window.addEventListener('wheel', handleWheel, { passive: false });
@@ -1161,10 +1175,23 @@
     
     if (DOM.goddess) {
       DOM.goddess.addEventListener('click', handleGoddessClick);
+      
+      // Get actual screen position
+      const rect = DOM.goddess.getBoundingClientRect();
+      
       console.log('✅ Goddess click handler attached to:', DOM.goddess);
       console.log('🔍 DEBUG: Goddess pointer-events:', 
         window.getComputedStyle(DOM.goddess).pointerEvents,
         'z-index:', window.getComputedStyle(DOM.goddess).zIndex);
+      console.log('🔍 DEBUG: Goddess position on screen:', {
+        top: rect.top,
+        left: rect.left,
+        bottom: rect.bottom,
+        right: rect.right,
+        width: rect.width,
+        height: rect.height,
+        visible: rect.width > 0 && rect.height > 0
+      });
     } else {
       console.warn('⚠️ Goddess element not found - cannot attach click handler');
     }
