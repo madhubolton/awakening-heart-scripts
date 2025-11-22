@@ -51,8 +51,8 @@
     metatronScale: 1.25,
     
     // Scene entry animation timing
-    sceneEntryDuration: 2.0,
-    metatronSpiralDuration: 1.8,  // Slightly longer for dramatic effect
+    sceneEntryDuration: 2.5,
+    metatronSpiralDuration: 2.0,  // Slightly longer for dramatic effect
     goddessFadeDuration: 0.6,     // Quick but smooth fade
     
     // Meditation mode transition timing
