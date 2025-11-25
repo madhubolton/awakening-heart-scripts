@@ -402,14 +402,14 @@
         {
           scale: 0.01,
           rotation: 0,
-          opacity: 0,
+          autoAlpha: 0,
           transformOrigin: '50% 50%',
           force3D: true
         },
         {
           scale: CONFIG.metatronScale,
           rotation: -720,
-          opacity: 1.0,
+          autoAlpha: 1.0,
           duration: CONFIG.metatronSpiralDuration,
           ease: 'power2.out',
           onStart: () => console.log('🌀 Metatron spiraling up')
@@ -435,6 +435,7 @@
     if (DOM.metatron) {
       tl.to(DOM.metatron, {
         opacity: CONFIG.metatronContentOpacity,
+        visibility: 'visible',
         duration: 0.6,
         ease: 'sine.out'
       });
@@ -656,6 +657,7 @@
     if (DOM.metatron) {
       tl.to(DOM.metatron, {
         opacity: CONFIG.metatronMeditationOpacity,
+        visibility: 'visible',
         duration: 0.9,
         ease: 'power2.out'
       }, 0.3);
@@ -734,6 +736,7 @@
     if (DOM.metatron) {
       tl.to(DOM.metatron, {
         opacity: CONFIG.metatronContentOpacity,
+        visibility: 'visible',
         duration: 0.7,
         ease: 'power2.in'
       }, 0.3);
@@ -1069,7 +1072,7 @@
         y: 0,
         x: 0,
         scale: 0.01,
-        opacity: 0,
+        autoAlpha: 0,
         rotation: 0,
         transformOrigin: '50% 50%',
         force3D: true,
