@@ -1,17 +1,10 @@
 /*--------------------------------------------------------------
-  Awakening Heart : Oracle Scene Controller v3.1.3
-  Version: 3.1.3 | Date: 2025-11-21
+  Awakening Heart : Oracle Scene Controller v3.2
+  Version: 3.2.0 | Date: 2025-11-20
   
-  FIXES in v3.1.3:
-  - CRITICAL: Removed pointer-events blocking from parent SVG (was preventing P_C clicks)
-  - Improved Metatron spiral easing (expo.out for "approaching from space" feel)
-  - Adjusted Goddess dock position (18vh instead of 20vh for better visual balance)
-  
-  FIXES in v3.1.2:
-  - Fixed Metatron appearing from distance (0.001 scale + y-offset)
-  - Fixed Goddess smooth fade-in on scene entry
-  - Fixed Goddess clickability (shader pointer-events issue)
-  - Fixed Metatron center clickability and cursor in meditation mode
+  FIXES in v3.2:
+  - Skips empty content blocks during navigation
+  - Only includes blocks with actual text content
   
   COMPLETE CYCLICAL FLOW:
   Entry Scene → Divination → New Scene Entry → Content Navigation → 
@@ -40,7 +33,7 @@
     breathDuckAmount: 0.15,
     
     // Goddess positions and scales
-    goddessDockY: '18vh',  // Moved up for better visual balance (~20px equivalent)
+    goddessDockY: '20vh',
     goddessDockScale: 0.5,
     goddessCenterY: 0,
     goddessCenterScale: 1.0,
@@ -52,8 +45,7 @@
     
     // Scene entry animation timing
     sceneEntryDuration: 2.0,
-    metatronSpiralDuration: 1.8,  // Slightly longer for dramatic effect
-    goddessFadeDuration: 0.6,     // Quick but smooth fade
+    metatronSpiralDuration: 1.6,
     
     // Meditation mode transition timing
     meditationTransitionDuration: 1.4,
@@ -101,6 +93,25 @@
   
   let DOM = {};
   
+  /**
+   * Check if a content block has meaningful content
+   */
+  function hasContent(element) {
+    if (!element) return false;
+    
+    // Get text content and trim whitespace
+    const text = element.textContent?.trim() || '';
+    
+    // Check if there's actual text
+    if (text.length > 0) return true;
+    
+    // Check for images or other visible content
+    const hasImages = element.querySelector('img') !== null;
+    const hasSvg = element.querySelector('svg') !== null;
+    
+    return hasImages || hasSvg;
+  }
+  
   function cacheDOM() {
     DOM = {
       title: document.getElementById('ah-title'),
@@ -131,7 +142,8 @@
       audioIcon: document.querySelector('#audioToggle svg, #audioToggle .icon-On')
     };
     
-    State.contentBlocks = [
+    // Collect all potential content blocks
+    const allBlocks = [
       DOM.intro,
       DOM.distinction,
       DOM.quote,
@@ -142,15 +154,30 @@
       DOM.prompt2,
       DOM.prompt3,
       DOM.prompt4
-    ].filter(Boolean);
+    ];
+    
+    // Filter to only include blocks with actual content
+    State.contentBlocks = allBlocks.filter(hasContent);
     
     console.log('📦 DOM cached:', {
-      contentBlocks: State.contentBlocks.length,
+      totalBlocks: allBlocks.length,
+      blocksWithContent: State.contentBlocks.length,
+      emptyBlocks: allBlocks.length - State.contentBlocks.length,
       goddess: !!DOM.goddess,
       metatron: !!DOM.metatron,
       center: !!DOM.metatronCenter,
       shader: !!DOM.shader
     });
+    
+    // Log which blocks have content
+    const blockNames = ['intro', 'distinction', 'quote', 'share', 'practice', 
+                        'prompt0', 'prompt1', 'prompt2', 'prompt3', 'prompt4'];
+    const contentStatus = allBlocks.map((block, i) => ({
+      name: blockNames[i],
+      hasContent: hasContent(block)
+    }));
+    
+    console.log('📝 Content blocks status:', contentStatus);
   }
 
   // ============================================================
@@ -369,27 +396,23 @@
       }
     });
     
-    // Metatron spirals UP from tiny distant center
+    // Metatron spirals UP from tiny center
     if (DOM.metatron) {
       tl.fromTo(DOM.metatron,
         {
-          y: '5vh',  // Start below center for depth
-          scale: 0.001,  // Much smaller for dramatic effect
+          scale: 0.01,
           rotation: 0,
           opacity: 0,
-          visibility: 'hidden',
           transformOrigin: '50% 50%',
           force3D: true
         },
         {
-          y: 0,  // Rise to true center
           scale: CONFIG.metatronScale,
           rotation: -720,
           opacity: 1.0,
-          visibility: 'visible',
           duration: CONFIG.metatronSpiralDuration,
-          ease: 'expo.out',  // Dramatic "approaching from distant space" feel
-          onStart: () => console.log('🌀 Metatron spiraling up from distance')
+          ease: 'power2.out',
+          onStart: () => console.log('🌀 Metatron spiraling up')
         },
         0
       );
@@ -403,20 +426,6 @@
           autoAlpha: 1,
           duration: 1.2,
           ease: 'sine.inOut'
-        },
-        '-=1.2'
-      );
-    }
-    
-    // Goddess fades IN quickly and smoothly
-    if (DOM.goddess) {
-      tl.fromTo(DOM.goddess,
-        { opacity: 0 },
-        {
-          opacity: 1,
-          duration: CONFIG.goddessFadeDuration,
-          ease: 'sine.inOut',
-          onStart: () => console.log('🌙 Goddess fading in')
         },
         '-=1.0'
       );
@@ -683,6 +692,7 @@
     
     let returnIndex = State.lastContentBlockBeforeMeditation;
     
+    // If we were at the last block, loop back to prompt0
     const finalPromptIndex = State.contentBlocks.length - 1;
     if (State.lastContentBlockBeforeMeditation === finalPromptIndex) {
       const prompt0Index = State.contentBlocks.findIndex(block => block === DOM.prompt0);
@@ -749,23 +759,11 @@
     
     console.log('🎯 Center divination enabled');
     
-    // Use direct DOM manipulation for pointer-events (GSAP has issues with SVG)
-    DOM.metatronCenter.style.pointerEvents = 'auto';
-    DOM.metatronCenter.style.cursor = 'pointer';
-    
-    // Use GSAP for visual properties
     gsap.set(DOM.metatronCenter, {
+      cursor: 'pointer',
+      pointerEvents: 'auto',
       opacity: 0.8
     });
-    
-    console.log('🔍 DEBUG: P_C after enable - pointer-events:', 
-      window.getComputedStyle(DOM.metatronCenter).pointerEvents,
-      'cursor:', window.getComputedStyle(DOM.metatronCenter).cursor,
-      'opacity:', window.getComputedStyle(DOM.metatronCenter).opacity,
-      'inline style pointer-events:', DOM.metatronCenter.style.pointerEvents);
-    
-    console.log('🔍 DEBUG: Metatron parent pointer-events:', 
-      window.getComputedStyle(DOM.metatron).pointerEvents);
     
     gsap.to(DOM.metatronCenter, {
       opacity: 1,
@@ -930,19 +928,9 @@
   }
   
   function handleGoddessClick(e) {
-    console.log('🔍 DEBUG: Goddess click event fired!', {
-      target: e.target,
-      currentTarget: e.currentTarget,
-      sceneEntryComplete: State.sceneEntryComplete,
-      inMeditation: State.inMeditation
-    });
-    
     e.stopPropagation();
     
-    if (!State.sceneEntryComplete) {
-      console.log('⏸️ Click ignored - scene entry not complete');
-      return;
-    }
+    if (!State.sceneEntryComplete) return;
     
     console.log('🌙 Goddess clicked');
     playSfx(DOM.goddessClickSfx);
@@ -960,34 +948,18 @@
     }
     
     if (State.inMeditation) {
-      console.log('📖 Exiting meditation mode');
       exitMeditationMode();
     } else {
-      console.log('🧘 Entering meditation mode');
       enterMeditationMode();
     }
   }
   
   function handleCenterClick(e) {
-    console.log('🔍 DEBUG: Center click event fired!', {
-      target: e.target,
-      currentTarget: e.currentTarget,
-      inMeditation: State.inMeditation,
-      sceneEntryComplete: State.sceneEntryComplete,
-      pointerEvents: window.getComputedStyle(e.currentTarget).pointerEvents
-    });
-    
     e.stopPropagation();
     
-    if (!State.inMeditation || !State.sceneEntryComplete) {
-      console.log('⏸️ Center click ignored:', {
-        inMeditation: State.inMeditation,
-        sceneEntryComplete: State.sceneEntryComplete
-      });
-      return;
-    }
+    if (!State.inMeditation || !State.sceneEntryComplete) return;
     
-    console.log('🎯 Center clicked - triggering divination');
+    console.log('🎯 Center clicked');
     playSfx(DOM.centerClickSfx);
     
     triggerDivination();
@@ -1077,65 +1049,41 @@
       }
     });
     
-    // Goddess at dock (matches entry scene end) but invisible for smooth fade-in
+    // Goddess at dock (matches entry scene end)
     if (DOM.goddess) {
       gsap.set(DOM.goddess, {
         y: CONFIG.goddessDockY,
         scale: CONFIG.goddessDockScale,
-        opacity: 0,  // Start invisible for smooth fade-in
-        visibility: 'visible',
+        autoAlpha: 1,
         cursor: 'pointer',
         pointerEvents: 'auto',
         transformOrigin: '50% 50%',
         zIndex: 50
       });
-      
-      // Backup: Force pointer-events via direct DOM (GSAP sometimes fails on divs too)
-      DOM.goddess.style.pointerEvents = 'auto';
-      DOM.goddess.style.cursor = 'pointer';
-      
-      console.log('🌙 Goddess initialized at dock position (invisible, ready for fade-in)');
-      console.log('🔍 DEBUG: Goddess pointer-events:', 
-        window.getComputedStyle(DOM.goddess).pointerEvents,
-        'z-index:', window.getComputedStyle(DOM.goddess).zIndex,
-        'cursor:', window.getComputedStyle(DOM.goddess).cursor,
-        'inline style pointer-events:', DOM.goddess.style.pointerEvents);
+      console.log('🌙 Goddess initialized at dock position');
     }
     
-    // Metatron tiny at distant center (ready to spiral up)
-    // CRITICAL: No pointer-events on parent SVG - let children control their own
+    // Metatron tiny at center (ready to spiral up)
     if (DOM.metatron) {
       gsap.set(DOM.metatron, {
-        y: '5vh',  // Start below center for depth effect
+        y: 0,
         x: 0,
-        scale: 0.001,  // Much smaller for dramatic "from distance" effect
+        scale: 0.01,
         opacity: 0,
         rotation: 0,
         transformOrigin: '50% 50%',
-        force3D: true
-        // NO pointerEvents here - parent must not block children!
+        force3D: true,
+        cursor: 'default',
+        pointerEvents: 'none'
       });
       
-      console.log('🔍 DEBUG: Metatron parent pointer-events:', 
-        window.getComputedStyle(DOM.metatron).pointerEvents);
-      
-      // Disable pointer events on all shapes EXCEPT P_C
-      // P_C is left completely untouched - just like entry scene!
+      // Ensure Metatron shapes don't block interaction
       const metatronShapes = DOM.metatron.querySelectorAll('polygon, polyline, path, circle');
       metatronShapes.forEach(shape => {
-        if (shape.id !== 'P_C') {
-          gsap.set(shape, { pointerEvents: 'none' });
-        }
-        // P_C: Don't touch it at all! It will be enabled by enableCenterDivination()
+        gsap.set(shape, { pointerEvents: 'none' });
       });
       
-      if (DOM.metatronCenter) {
-        console.log('🔍 DEBUG: P_C initial (untouched) pointer-events:', 
-          window.getComputedStyle(DOM.metatronCenter).pointerEvents,
-          'has inline style:', DOM.metatronCenter.style.pointerEvents || 'none');
-      }
-      
-      console.log('🌀 Metatron initialized at tiny distant center (P_C untouched)');
+      console.log('🌀 Metatron initialized at tiny center');
     }
     
     // Title hidden
@@ -1143,11 +1091,19 @@
       gsap.set(DOM.title, { autoAlpha: 0, scale: 0 });
     }
     
-    // Shader hidden - CRITICAL: pointer-events none so goddess remains clickable
+    // Shader hidden
     if (DOM.shader) {
       gsap.set(DOM.shader, { 
         autoAlpha: 0,
-        pointerEvents: 'none'  // Ensures clicks pass through to goddess below
+        pointerEvents: 'none'
+      });
+    }
+    
+    // Center disabled
+    if (DOM.metatronCenter) {
+      gsap.set(DOM.metatronCenter, {
+        pointerEvents: 'none',
+        opacity: 0
       });
     }
     
@@ -1159,50 +1115,18 @@
   function attachEventListeners() {
     console.log('🔗 Attaching event listeners');
     
-    // DEBUG: Global click listener to see if clicks work at all
-    document.addEventListener('click', (e) => {
-      const elementAtPoint = document.elementFromPoint(e.clientX, e.clientY);
-      console.log('🔍 DEBUG: Global click detected at:', e.clientX, e.clientY, 
-        'target:', e.target,
-        'elementAtPoint:', elementAtPoint,
-        'elementAtPoint id:', elementAtPoint?.id || 'no-id',
-        'elementAtPoint pointer-events:', elementAtPoint ? window.getComputedStyle(elementAtPoint).pointerEvents : 'N/A');
-    });
-    
     window.addEventListener('wheel', handleWheel, { passive: false });
     window.addEventListener('touchstart', handleTouchStart, { passive: true });
     window.addEventListener('touchend', handleTouchEnd, { passive: true });
     
     if (DOM.goddess) {
       DOM.goddess.addEventListener('click', handleGoddessClick);
-      
-      // Get actual screen position
-      const rect = DOM.goddess.getBoundingClientRect();
-      
-      console.log('✅ Goddess click handler attached to:', DOM.goddess);
-      console.log('🔍 DEBUG: Goddess pointer-events:', 
-        window.getComputedStyle(DOM.goddess).pointerEvents,
-        'z-index:', window.getComputedStyle(DOM.goddess).zIndex);
-      console.log('🔍 DEBUG: Goddess position on screen:', {
-        top: rect.top,
-        left: rect.left,
-        bottom: rect.bottom,
-        right: rect.right,
-        width: rect.width,
-        height: rect.height,
-        visible: rect.width > 0 && rect.height > 0
-      });
-    } else {
-      console.warn('⚠️ Goddess element not found - cannot attach click handler');
+      console.log('✅ Goddess click handler attached');
     }
     
     if (DOM.metatronCenter) {
       DOM.metatronCenter.addEventListener('click', handleCenterClick);
-      console.log('✅ Center click handler attached to:', DOM.metatronCenter);
-      console.log('🔍 DEBUG: P_C pointer-events:', 
-        window.getComputedStyle(DOM.metatronCenter).pointerEvents);
-    } else {
-      console.warn('⚠️ Metatron center (P_C) not found - cannot attach click handler');
+      console.log('✅ Center click handler attached');
     }
     
     if (DOM.audioToggle) {
@@ -1211,9 +1135,16 @@
   }
   
   async function init() {
-    console.log('💖 Oracle Scene Controller v3.1.2 initializing...');
+    console.log('💖 Oracle Scene Controller v3.2 initializing...');
     
     cacheDOM();
+    
+    // Check if we have any content blocks
+    if (State.contentBlocks.length === 0) {
+      console.error('❌ No content blocks found! Scene cannot function.');
+      return;
+    }
+    
     setupInitialState();
     await initAudio();
     attachEventListeners();
