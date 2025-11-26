@@ -387,91 +387,100 @@
   async function playSceneEntryAnimation() {
     console.log('🎬 Playing scene entry animation');
     
-    const tl = gsap.timeline({
-      defaults: { ease: 'power2.inOut' },
-      onComplete: () => {
+    return new Promise((resolve) => {
+      const tl = gsap.timeline({
+        defaults: { ease: 'power2.inOut' },
+        onComplete: () => {
+          State.sceneEntryComplete = true;
+          State.canScroll = true;
+          console.log('✅ Scene entry complete - content mode active');
+          resolve(); // Resolve promise when animation completes
+        }
+      });
+      
+      // Metatron spirals UP from tiny center
+      if (DOM.metatron) {
+        tl.fromTo(DOM.metatron,
+          {
+            scale: 0.01,
+            rotation: 0,
+            autoAlpha: 0,
+            transformOrigin: '50% 50%',
+            force3D: true
+          },
+          {
+            scale: CONFIG.metatronScale,
+            rotation: -720,
+            autoAlpha: 1.0,
+            duration: CONFIG.metatronSpiralDuration,
+            ease: 'power2.out',
+            onStart: () => console.log('🌀 Metatron spiraling up')
+          },
+          0
+        );
+      }
+      
+      // Shader fades IN
+      if (DOM.shader) {
+        tl.fromTo(DOM.shader,
+          { autoAlpha: 0 },
+          {
+            autoAlpha: 1,
+            duration: 1.2,
+            ease: 'sine.inOut'
+          },
+          '-=1.0'
+        );
+      }
+      
+      // Metatron dims to content mode
+      if (DOM.metatron) {
+        tl.to(DOM.metatron, {
+          opacity: CONFIG.metatronContentOpacity,
+          visibility: 'visible',
+          duration: 0.6,
+          ease: 'sine.out'
+        });
+      }
+      
+      // Title appears
+      if (DOM.title) {
+        tl.fromTo(DOM.title,
+          { autoAlpha: 0, scale: 0 },
+          {
+            autoAlpha: 1,
+            scale: 1,
+            duration: 0.8,
+            ease: 'power2.out'
+          },
+          '-=0.4'
+        );
+      }
+      
+      // First content block breathes OUT
+      const firstBlock = State.contentBlocks[0];
+      if (firstBlock) {
+        tl.fromTo(firstBlock,
+          { autoAlpha: 0, scale: 0 },
+          {
+            autoAlpha: 1,
+            scale: 1,
+            duration: CONFIG.breathOut,
+            ease: 'power2.out',
+            transformOrigin: '50% 50%'
+          },
+          '-=0.2'
+        );
+      }
+      
+      // If timeline is empty, resolve immediately
+      if (tl.totalDuration() === 0) {
+        console.warn('⚠️ Scene entry timeline is empty, resolving immediately');
         State.sceneEntryComplete = true;
         State.canScroll = true;
-        console.log('✅ Scene entry complete - content mode active');
+        resolve();
       }
     });
-    
-    // Metatron spirals UP from tiny center
-    if (DOM.metatron) {
-      tl.fromTo(DOM.metatron,
-        {
-          scale: 0.01,
-          rotation: 0,
-          autoAlpha: 0,
-          transformOrigin: '50% 50%',
-          force3D: true
-        },
-        {
-          scale: CONFIG.metatronScale,
-          rotation: -720,
-          autoAlpha: 1.0,
-          duration: CONFIG.metatronSpiralDuration,
-          ease: 'power2.out',
-          onStart: () => console.log('🌀 Metatron spiraling up')
-        },
-        0
-      );
-    }
-    
-    // Shader fades IN
-    if (DOM.shader) {
-      tl.fromTo(DOM.shader,
-        { autoAlpha: 0 },
-        {
-          autoAlpha: 1,
-          duration: 1.2,
-          ease: 'sine.inOut'
-        },
-        '-=1.0'
-      );
-    }
-    
-    // Metatron dims to content mode
-    if (DOM.metatron) {
-      tl.to(DOM.metatron, {
-        opacity: CONFIG.metatronContentOpacity,
-        visibility: 'visible',
-        duration: 0.6,
-        ease: 'sine.out'
-      });
-    }
-    
-    // Title appears
-    if (DOM.title) {
-      tl.fromTo(DOM.title,
-        { autoAlpha: 0, scale: 0 },
-        {
-          autoAlpha: 1,
-          scale: 1,
-          duration: 0.8,
-          ease: 'power2.out'
-        },
-        '-=0.4'
-      );
-    }
-    
-    // First content block breathes OUT
-    const firstBlock = State.contentBlocks[0];
-    if (firstBlock) {
-      tl.fromTo(firstBlock,
-        { autoAlpha: 0, scale: 0 },
-        {
-          autoAlpha: 1,
-          scale: 1,
-          duration: CONFIG.breathOut,
-          ease: 'power2.out',
-          transformOrigin: '50% 50%'
-        },
-        '-=0.2'
-      );
-    }
-    
-    return tl;
   }
 
   // ============================================================
@@ -1138,40 +1147,68 @@
   }
   
   async function init() {
-    console.log('💖 Oracle Scene Controller v3.2 initializing...');
-    
-    cacheDOM();
-    
-    // Check if we have any content blocks
-    if (State.contentBlocks.length === 0) {
-      console.error('❌ No content blocks found! Scene cannot function.');
-      return;
-    }
-    
-    setupInitialState();
-    await initAudio();
-    attachEventListeners();
-    await playSceneEntryAnimation();
-    
-    if (window.metatron && window.AHCONFIG) {
-      const timing = window.AHCONFIG.timing || {};
+    try {
+      console.log('💖 Oracle Scene Controller v3.2 initializing...');
       
-      if (timing.portalsDelay !== undefined) {
-        setTimeout(() => {
-          if (window.metatron.startPortals) {
-            window.metatron.startPortals(window.AHCONFIG.portals);
-          }
-        }, timing.portalsDelay * 1000);
+      cacheDOM();
+      
+      // Check if we have any content blocks
+      if (State.contentBlocks.length === 0) {
+        console.error('❌ No content blocks found! Scene cannot function.');
+        return;
       }
+      
+      console.log('⏳ Setting up initial state...');
+      setupInitialState();
+      
+      console.log('⏳ Initializing audio...');
+      await initAudio();
+      
+      console.log('⏳ Attaching event listeners...');
+      attachEventListeners();
+      
+      console.log('⏳ About to play scene entry animation...');
+      await playSceneEntryAnimation();
+      
+      if (window.metatron && window.AHCONFIG) {
+        const timing = window.AHCONFIG.timing || {};
+        
+        if (timing.portalsDelay !== undefined) {
+          setTimeout(() => {
+            if (window.metatron.startPortals) {
+              window.metatron.startPortals(window.AHCONFIG.portals);
+            }
+          }, timing.portalsDelay * 1000);
+        }
+      }
+      
+      console.log('✨ Oracle Scene Controller ready - content mode active');
+    } catch (error) {
+      console.error('❌ Scene controller initialization failed:', error);
+      console.error('Stack trace:', error.stack);
+      
+      // Attempt recovery - force play animation after short delay
+      console.log('🔄 Attempting recovery...');
+      setTimeout(async () => {
+        try {
+          await playSceneEntryAnimation();
+        } catch (e) {
+          console.error('❌ Recovery failed:', e);
+        }
+      }, 500);
     }
-    
-    console.log('✨ Oracle Scene Controller ready - content mode active');
   }
   
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
   } else {
-    init();
+    // Add small delay to ensure everything is ready after navigation
+    if (document.referrer && document.referrer.includes(window.location.origin)) {
+      console.log('🔄 Detected internal navigation, adding initialization delay...');
+      setTimeout(init, 100);
+    } else {
+      init();
+    }
   }
   
   // ============================================================
