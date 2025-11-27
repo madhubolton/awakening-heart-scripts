@@ -1,123 +1,161 @@
 /*--------------------------------------------------------------
-  Awakening Heart : Oracle Opening Sequence
-  Version: 10.4.2 | 2025-11-21
+  Awakening Heart : Oracle Entry Sequence
+  Version: 11.0.0 | 2025-11-27
   
-  FLOW
-
-  1) Title + prompt carousel plays with overlay.
-     - Goddess NOT visible yet.
-
-  2) ENTRY CLICK (overlay / general enter)
-     - Overlay fades, temple dissolves, Metatron scales up
-     - Shader reveals
-     - Audio starts
-     - Goddess glides in gracefully from above
-     - Facet animation starts and loops continuously
-     - Metatron center becomes clickable (pulsing)
-
-  3) CENTER CLICK (P_C)
-     - Stop facet loop
-     - Goddess drops + scales down and parks at bottom
-     - Metatron shrinks and spins into the center, shader fades
-     - Navigate to RANDOM CMS scene using weighted selection (excludes opening scene)
-
-  CHANGES in v10.4.0:
-  - Goddess now glides in gracefully like Guild Navigators (Dune)
-  - Scene randomizer now excludes opening/entry scene from selection
+  FLOW:
+  1) Title animates → Welcome (prompt0) breathes out → PAUSE
+  2) User scrolls/clicks → breathing navigation through prompts 0-3
+     - Each transition lights up corresponding stairway step
+     - Click zones: top 50% = back, bottom 50% = forward
+  3) After final prompt, user enters oracle (navigates to random CMS scene)
   
-  CHANGES in v10.4.1:
-  - Added audio fade at 30% of Metatron divination animation for smooth transitions
-  
-  CHANGES in v10.4.2:
-  - Added shader fade at 30% of Metatron animation, synchronized with audio fade
+  CHANGES in v11.0:
+  - Prompts 1-3 now user-controlled with breathing navigation
+  - Click navigation with top/bottom zones
+  - Stairway lights respond to prompt navigation
+  - NO audio autoplay - user enables manually
+  - Metatron stays at normal scale during entry
+  - Goddess glides in during general entry, drops to dock before divination
+  - Facet loop removed from entry sequence
 --------------------------------------------------------------*/
 
 document.addEventListener("DOMContentLoaded", () => {
-  console.log("💖 Awakening Heart : Oracle Opening initialized (v10.4.2)");
+  console.log("💖 Awakening Heart : Entry Sequence initialized (v11.0)");
 
-  // ------- Core DOM -------
-  const overlay   = document.getElementById("oracleOverlay") || document.getElementById("overlay");
-  const temple    = document.getElementById("temple-container");
-  const title     = document.getElementById("ah-title");
-  const shaderW   = document.querySelector(".shader-wrapper");
-  const metatron  = document.getElementById("metatron");
-  const bg        = document.getElementById("bgMusic");
-  const audioUI   = document.querySelector(".audio-buttons");
-  const goddess   = document.getElementById("triple-goddess-wrapper");
+  // ============================================================
+  // DOM CACHE
+  // ============================================================
   
-  // Audio toggle button with icon
-  const audioToggle = document.getElementById("audioToggle");
-  const icon = audioToggle?.querySelector("svg") || audioToggle?.querySelector(".icon-On");
+  const DOM = {
+    overlay: document.getElementById("oracleOverlay") || document.getElementById("overlay"),
+    temple: document.getElementById("temple-container"),
+    title: document.getElementById("ah-title"),
+    shaderW: document.querySelector(".shader-wrapper"),
+    metatron: document.getElementById("metatron"),
+    bg: document.getElementById("bgMusic"),
+    audioUI: document.querySelector(".audio-buttons"),
+    goddess: document.getElementById("triple-goddess-wrapper"),
+    audioToggle: document.getElementById("audioToggle"),
+    audioIcon: document.querySelector("#audioToggle svg, #audioToggle .icon-On"),
+    
+    prompts: [
+      document.getElementById("prompt0"), // Welcome
+      document.getElementById("prompt1"),
+      document.getElementById("prompt2"),
+      document.getElementById("prompt3")  // Final prompt
+    ].filter(Boolean)
+  };
 
-  // Get oracle scene audio URL with fallback
-  const oracleAudioUrl = bg?.getAttribute("data-scene-audio") || bg?.src;
+  const oracleAudioUrl = DOM.bg?.getAttribute("data-scene-audio") || DOM.bg?.src;
 
-  // Prompt elements (intro text)
-  const prompts = [
-    document.getElementById("prompt0"), // Welcome
-    document.getElementById("prompt1"),
-    document.getElementById("prompt2"),
-    document.getElementById("prompt3"),
-    document.getElementById("prompt4")  // "You may enter. Click when ready."
-  ].filter(Boolean);
-
-  console.log("🧩 Elements found:", { 
-    overlay: !!overlay,
-    temple: !!temple,
-    title: !!title,
-    shaderW: !!shaderW,
-    metatron: !!metatron,
-    bg: !!bg,
-    audioUI: !!audioUI,
-    audioToggle: !!audioToggle,
-    icon: !!icon,
-    goddess: !!goddess,
-    promptsLen: prompts.length,
-    patternsLibrary: !!window.AHPatterns
+  console.log("🧩 Elements cached:", { 
+    overlay: !!DOM.overlay,
+    temple: !!DOM.temple,
+    title: !!DOM.title,
+    metatron: !!DOM.metatron,
+    goddess: !!DOM.goddess,
+    promptCount: DOM.prompts.length,
+    lightsAvailable: !!window.AHLights
   });
 
-  // ------- IMMEDIATE HIDE to prevent flicker -------
-  prompts.forEach(p => {
+  // ============================================================
+  // STATE
+  // ============================================================
+  
+  const State = {
+    currentPromptIndex: 0,
+    titleComplete: false,
+    inPromptMode: false,
+    canNavigate: false,
+    isTransitioning: false,
+    enteredOracle: false,
+    touchStartY: 0,
+    touchStartX: 0
+  };
+
+  // ============================================================
+  // CONFIGURATION
+  // ============================================================
+  
+  const CONFIG = {
+    breathIn: 0.8,
+    breathPause: 0.2,
+    breathOut: 1.2,
+    scrollCooldown: 300,
+    swipeMinDistance: 50,
+    audioVolume: 0.35
+  };
+
+  // ============================================================
+  // INITIAL SETUP
+  // ============================================================
+  
+  // Hide all prompts initially
+  DOM.prompts.forEach(p => {
     if (p) {
       p.style.visibility = "hidden";
       p.style.opacity = "0";
+      gsap.set(p, { autoAlpha: 0, scale: 0 });
     }
   });
 
-  // ------- Flags -------
-  let readyForClick      = false;   // ready for first "enter" click
-  let sequenceStarted    = false;   // has enterSequence run
-  let divinationStarted  = false;   // has center-click sequence started
-  let facetLoopActive    = false;   // is facet loop currently running
-  let facetLoopTl        = null;    // GSAP timeline for facets
-
-  // ============================================================
-  // SCENE POOL & RANDOMIZATION
-  // ============================================================
+  // Initial states
+  gsap.set(DOM.title, { autoAlpha: 0, clearProps: "transform" });
+  gsap.set(DOM.shaderW, { autoAlpha: 0, pointerEvents: "none" });
+  gsap.set(DOM.audioUI, { autoAlpha: 0, pointerEvents: "none" });
   
-  /**
-   * Determine if we're currently on the opening/entry scene
-   * The opening scene is typically at root or has no /scenes/ path
-   */
-  function isOpeningScene() {
-    const path = window.location.pathname;
-    // Opening scene doesn't have /scenes/ in path
-    return !path.includes('/scenes/');
+  // Goddess hidden until general entry
+  if (DOM.goddess) {
+    gsap.set(DOM.goddess, {
+      autoAlpha: 0,
+      pointerEvents: "none",
+      y: "-15vh",
+      scale: 0.85,
+      transformOrigin: "50% 50%"
+    });
+  }
+
+  gsap.set([DOM.overlay, DOM.temple], { autoAlpha: 1 });
+  
+  // Metatron visible at normal size
+  if (DOM.metatron) {
+    gsap.set(DOM.metatron, { 
+      autoAlpha: 1,
+      scale: 1,
+      opacity: 1,
+      visibility: "visible",
+      transformOrigin: "50% 50%", 
+      force3D: true 
+    });
   }
   
-  /**
-   * Load available scenes from CMS collection list
-   */
+  // Audio icon OFF state
+  if (DOM.audioIcon) gsap.set(DOM.audioIcon, { opacity: 0.4 });
+  
+  // Audio starts paused
+  if (DOM.bg) { 
+    DOM.bg.pause(); 
+    DOM.bg.volume = 0; 
+    DOM.bg.muted = false;
+    if (oracleAudioUrl && DOM.bg.src !== oracleAudioUrl) {
+      console.log("🔄 Setting audio source:", oracleAudioUrl);
+      DOM.bg.src = oracleAudioUrl;
+    }
+  }
+
+  gsap.set(document.documentElement, { cursor: "default" });
+
+  // ============================================================
+  // SCENE RANDOMIZATION
+  // ============================================================
+  
   function loadScenePool() {
     const items = document.querySelectorAll('.scene-pool-item');
     const pool = Array.from(items).map(item => {
       let url = item.dataset.sceneUrl || '';
-      
-      // If URL doesn't start with /, it's just a slug - add /scenes/ prefix
       if (url && !url.startsWith('/')) {
         url = '/scenes/' + url;
       }
-      
       return {
         id: item.dataset.sceneId,
         url: url,
@@ -126,14 +164,39 @@ document.addEventListener("DOMContentLoaded", () => {
       };
     });
     
-    console.log('🎲 Scene pool loaded:', pool.length, 'scenes');
-    return pool;
+    const validPool = pool.filter(s => s.url && s.url.startsWith('/scenes/') && s.id);
+    console.log('🎲 Scene pool loaded:', validPool.length, 'valid scenes');
+    console.log('📋 Pool contents:', validPool.map(s => ({ id: s.id, weight: s.weight })));
+    
+    return validPool;
   }
   
-  /**
-   * Select random scene using weighted randomization
-   * CRITICAL: Excludes opening scene - only selects from actual oracle scenes
-   */
+  function getSceneHistory() {
+    try {
+      const stored = localStorage.getItem('ah_scene_history');
+      const history = stored ? JSON.parse(stored) : [];
+      console.log('📚 Current history:', history);
+      return history;
+    } catch (e) {
+      console.warn('⚠️ Could not read history:', e);
+      return [];
+    }
+  }
+  
+  function saveToHistory(sceneId) {
+    try {
+      let history = getSceneHistory();
+      history.push(sceneId);
+      if (history.length > 3) {
+        history = history.slice(-3);
+      }
+      localStorage.setItem('ah_scene_history', JSON.stringify(history));
+      console.log('💾 History updated:', history);
+    } catch (e) {
+      console.warn('⚠️ Could not save history:', e);
+    }
+  }
+  
   function selectRandomScene() {
     const pool = loadScenePool();
     
@@ -142,181 +205,80 @@ document.addEventListener("DOMContentLoaded", () => {
       return null;
     }
     
-    // Filter out any scenes that don't have proper /scenes/ URLs
-    // This prevents selecting the opening scene
-    const validScenes = pool.filter(scene => {
-      return scene.url && scene.url.startsWith('/scenes/') && scene.id;
-    });
+    const history = getSceneHistory();
+    const excluded = ['opening-entry', ...history];
     
-    if (validScenes.length === 0) {
-      console.error('❌ No valid oracle scenes available!');
-      return null;
+    console.log('🚫 Excluding from selection:', excluded);
+    
+    const available = pool.filter(scene => !excluded.includes(scene.id));
+    
+    console.log('✅ Available scenes:', available.length, '/', pool.length);
+    console.log('📋 Available:', available.map(s => s.id));
+    
+    if (available.length === 0) {
+      console.warn('⚠️ No available scenes after exclusion, using fallback');
+      const fallback = pool[0];
+      console.log('🎯 Fallback scene:', fallback.id);
+      return fallback;
     }
     
-    // Calculate total weight from valid scenes only
-    const totalWeight = validScenes.reduce((sum, scene) => sum + scene.weight, 0);
-    
-    // Weighted random selection
+    const totalWeight = available.reduce((sum, scene) => sum + scene.weight, 0);
     let random = Math.random() * totalWeight;
     
-    for (const scene of validScenes) {
+    console.log('🎰 Random selection (weight-based):', random.toFixed(2), '/', totalWeight.toFixed(2));
+    
+    for (const scene of available) {
       random -= scene.weight;
       if (random <= 0) {
-        console.log('🎯 Entry scene selected:', scene.id, `(weight: ${scene.weight})`);
-        console.log('📍 Navigating to:', scene.url);
+        console.log('🎯 Selected scene:', scene.id, `(weight: ${scene.weight})`);
+        console.log('📍 URL:', scene.url);
         return scene;
       }
     }
     
-    // Fallback to first valid scene
-    console.log('🎯 Fallback to first valid scene:', validScenes[0].id);
-    return validScenes[0];
+    const fallback = available[0];
+    console.log('🎯 Fallback to first available:', fallback.id);
+    return fallback;
   }
 
-  // ------- Initial states -------
-  gsap.set([title], { autoAlpha: 0, clearProps: "transform" });
-  gsap.set(prompts, { autoAlpha: 0, scale: 0, visibility: "hidden" });
-  gsap.set(shaderW,   { autoAlpha: 0, pointerEvents: "none" });
-  gsap.set(audioUI,   { autoAlpha: 0, pointerEvents: "none" });
+  // ============================================================
+  // SHADER HELPER
+  // ============================================================
   
-  // Goddess is NOT visible until general enter click
-  if (goddess) {
-    gsap.set(goddess, {
-      autoAlpha: 0,
-      pointerEvents: "none",
-      y: "-15vh",    // Start from above for gliding entrance
-      scale: 0.85,
-      transformOrigin: "50% 50%"
-    });
-  }
-
-  gsap.set([overlay, temple], { autoAlpha: 1 });
-  
-  // Metatron visible at normal size (overrides synchronous hiding script)
-  if (metatron) {
-    gsap.set(metatron, { 
-      autoAlpha: 1,              // Visible
-      scale: 1,                  // Normal size
-      opacity: 1,                // Explicit opacity
-      visibility: "visible",      // Override inline hiding
-      transformOrigin: "50% 50%", 
-      force3D: true 
-    });
-  }
-  
-  // Icon: dark/off state initially
-  if (icon) gsap.set(icon, { opacity: 0.4 });
-  
-  if (bg) { 
-    bg.pause(); 
-    bg.volume = 0; 
-    bg.muted = false;
-    if (oracleAudioUrl && bg.src !== oracleAudioUrl) {
-      console.log("🔄 Setting audio source:", oracleAudioUrl);
-      bg.src = oracleAudioUrl;
-    }
-  }
-
-  // Reset cursor to default initially
-  gsap.set(document.documentElement, { cursor: "default" });
-
-  // Helper to turn on shader beams
   const revealShader = () => {
     if (window.AHShader?.reveal) {
       window.AHShader.reveal({ beams: true });
-    } else if (shaderW) {
-      gsap.to(shaderW, { autoAlpha: 1, duration: 0.6, ease: "sine.inOut" });
+    } else if (DOM.shaderW) {
+      gsap.to(DOM.shaderW, { autoAlpha: 1, duration: 0.6, ease: "sine.inOut" });
     }
   };
 
-  // ------- FACET LOOP HELPERS -------
-
-  function startFacetLoop() {
-    if (facetLoopActive) return;
-    facetLoopActive = true;
-
-    const facetIds = [
-      "F_O_TRI1_T", "F_O_TRI2_T",
-      "F_I_BG_TR", "F_I_OCT_TR", "F_I_TRI1_TR", "F_I_TRI2_TR",
-      "F_I_OCT_R", "F_I_BG_R",
-      "F_O_TRI1_BR", "F_O_TRI2_BR",
-      "F_I_BG_BR", "F_I_OCT_BR",
-      "F_I_TRI1_B", "F_I_TRI2_B",
-      "F_I_OCT_BL", "F_I_BG_BL",
-      "F_O_TRI1_BL", "F_O_TRI2_BL",
-      "F_I_BG_L", "F_I_OCT_L",
-      "F_I_TRI1_TL", "F_I_TRI2_TL",
-      "F_I_OCT_TL", "F_I_BG_TL"
-    ];
-
-    console.log("✨ Starting continuous facet loop");
-
-    if (window.AHPatterns && typeof window.AHPatterns.sequential === "function") {
-      // Ask AHPatterns to give us a looping sequence
-      facetLoopTl = window.AHPatterns.sequential(facetIds, {
-        fill: "#77ffcc",
-        duration: 1.4,
-        stagger: 0.10,
-        repeat: -1,        // continuous
-        yoyo: true,
-        ease: "sine.inOut"
-      });
-    } else {
-      console.warn("⚠️ AHPatterns not available - using fallback facet loop");
-      const allFacets = document.querySelectorAll('[id^="F_"]');
-      facetLoopTl = gsap.to(allFacets, {
-        fill: "#77ffcc",
-        duration: 1.4,
-        stagger: 0.1,
-        repeat: -1,
-        yoyo: true,
-        ease: "sine.inOut"
-      });
-    }
-  }
-
-  function stopFacetLoop() {
-    if (!facetLoopActive) return;
-    facetLoopActive = false;
-
-    console.log("🛑 Stopping facet loop");
-
-    if (facetLoopTl && typeof facetLoopTl.kill === "function") {
-      facetLoopTl.kill();
-    }
-
-    const allFacets = document.querySelectorAll('[id^="F_"]');
-    gsap.killTweensOf(allFacets);
-
-    facetLoopTl = null;
-  }
-
-  // ------- Opening timeline (title + prompts) -------
-  const tl = gsap.timeline({
+  // ============================================================
+  // TITLE ANIMATION (automatic, ends with prompt0)
+  // ============================================================
+  
+  const titleTimeline = gsap.timeline({
     defaults: { ease: "sine.inOut" },
-    onStart: () => console.log("🎬 Oracle opening sequence started"),
     onComplete: () => {
-      console.log("✨ Oracle intro complete – ready for entry click");
-      readyForClick = true;
+      console.log("✨ Title complete - Welcome visible, awaiting user input");
+      State.titleComplete = true;
+      State.inPromptMode = true;
+      State.canNavigate = true;
       gsap.set(document.documentElement, { cursor: "pointer" });
-      if (overlay) gsap.set(overlay, { cursor: "pointer" });
     }
   });
 
-  // 1) Title fade & glow (no zoom)
-  tl.to(title, { autoAlpha: 1, duration: 1.0 })
-    .to(title, { color: "hsl(268, 30%, 85%)", duration: 0.5 }, "<")
-    .to(title, { color: "hsl(268, 50%, 60%)", duration: 0.75 });
+  // Title fade & glow
+  titleTimeline
+    .to(DOM.title, { autoAlpha: 1, duration: 1.0 })
+    .to(DOM.title, { color: "hsl(268, 30%, 85%)", duration: 0.5 }, "<")
+    .to(DOM.title, { color: "hsl(268, 50%, 60%)", duration: 0.75 });
 
-  // 2) Prompt carousel – "breathe" out from center and back in
-  prompts.forEach((p, idx) => {
-    if (!p) return;
-    
-    const isInvite = (p.id === "prompt4");
-    const displayDuration = (idx >= 1 && idx <= 3) ? "+=2.0" : "+=1.0";
-    
-    // "Breathe out" - scale from 0 to 1
-    tl.fromTo(p,
+  // Welcome (prompt0) breathes out
+  const welcomePrompt = DOM.prompts[0];
+  if (welcomePrompt) {
+    titleTimeline.fromTo(
+      welcomePrompt,
       { 
         autoAlpha: 0, 
         scale: 0,
@@ -326,68 +288,177 @@ document.addEventListener("DOMContentLoaded", () => {
         autoAlpha: 1, 
         scale: 1,
         visibility: "visible",
-        duration: 1.2, 
+        duration: CONFIG.breathOut, 
         ease: "power2.out",
-        immediateRender: true
+        immediateRender: true,
+        onStart: () => {
+          console.log("🌬️ Welcome breathing out");
+          if (window.AHLights) {
+            window.AHLights.navigateToPrompt(0);
+          }
+        }
       }
     );
+  }
+
+  // ============================================================
+  // BREATHING NAVIGATION
+  // ============================================================
+  
+  function breatheIn(element) {
+    console.log("🌬️ Breathing in...");
+    return gsap.to(element, {
+      scale: 0,
+      autoAlpha: 0,
+      duration: CONFIG.breathIn,
+      ease: 'power2.in',
+      transformOrigin: '50% 50%'
+    });
+  }
+  
+  function breatheOut(element) {
+    console.log("🌬️ Breathing out...");
+    return gsap.fromTo(element,
+      { scale: 0, autoAlpha: 0 },
+      {
+        scale: 1,
+        autoAlpha: 1,
+        visibility: 'visible',
+        duration: CONFIG.breathOut,
+        ease: 'power2.out',
+        transformOrigin: '50% 50%'
+      }
+    );
+  }
+  
+  function navigateToPrompt(targetIndex) {
+    if (State.isTransitioning) {
+      console.log("⏳ Navigation blocked - transition in progress");
+      return;
+    }
     
-    if (!isInvite) {
-      // "Breathe back in" - scale back to 0
-      tl.to(p, { 
-        autoAlpha: 0, 
-        scale: 0,
-        duration: 0.8, 
-        ease: "power2.in" 
-      }, displayDuration);
-    } else {
-      // The invite stays visible at full size
-      tl.set(p, { scale: 1 }, "+=0.3");
+    if (targetIndex < 0 || targetIndex >= DOM.prompts.length) {
+      console.log("🚫 Invalid prompt index:", targetIndex);
+      return;
     }
-  });
+    
+    State.isTransitioning = true;
+    State.canNavigate = false;
+    
+    const currentPrompt = DOM.prompts[State.currentPromptIndex];
+    const nextPrompt = DOM.prompts[targetIndex];
+    
+    console.log(`📖 Navigating prompts: ${State.currentPromptIndex} → ${targetIndex}`);
+    
+    const tl = gsap.timeline({
+      onComplete: () => {
+        State.currentPromptIndex = targetIndex;
+        State.isTransitioning = false;
+        
+        setTimeout(() => {
+          State.canNavigate = true;
+          console.log("✅ Navigation ready");
+        }, CONFIG.scrollCooldown);
+        
+        // Update stairway lights
+        if (window.AHLights) {
+          window.AHLights.navigateToPrompt(targetIndex);
+        }
+      }
+    });
+    
+    // Breathe in current
+    if (currentPrompt) {
+      tl.add(breatheIn(currentPrompt), 0);
+    }
+    
+    // Pause
+    tl.to({}, { duration: CONFIG.breathPause });
+    
+    // Breathe out next
+    tl.add(breatheOut(nextPrompt));
+    
+    return tl;
+  }
+  
+  function navigateForward() {
+    if (!State.canNavigate || !State.inPromptMode || State.enteredOracle) {
+      console.log("⏸️ Forward navigation blocked");
+      return;
+    }
+    
+    const nextIndex = State.currentPromptIndex + 1;
+    
+    // If at last prompt, enter oracle
+    if (nextIndex >= DOM.prompts.length) {
+      console.log("🚪 Reached end - entering oracle");
+      enterOracle();
+      return;
+    }
+    
+    navigateToPrompt(nextIndex);
+  }
+  
+  function navigateBackward() {
+    if (!State.canNavigate || !State.inPromptMode || State.enteredOracle) {
+      console.log("⏸️ Backward navigation blocked");
+      return;
+    }
+    
+    const prevIndex = State.currentPromptIndex - 1;
+    
+    if (prevIndex < 0) {
+      console.log("🚫 Already at first prompt");
+      return;
+    }
+    
+    navigateToPrompt(prevIndex);
+  }
 
-  // ------- ENTRY SEQUENCE (click-anywhere) -------
-  async function enterSequence() {
-    if (sequenceStarted || !readyForClick) return;
-    sequenceStarted = true;
-    console.log("🚪 Oracle entered");
-
+  // ============================================================
+  // ORACLE ENTRY (after final prompt)
+  // ============================================================
+  
+  function enterOracle() {
+    if (State.enteredOracle) return;
+    State.enteredOracle = true;
+    State.canNavigate = false;
+    
+    console.log("🚪 Entering oracle...");
+    
     gsap.set(document.documentElement, { cursor: "default" });
-
-    // Hide invite prompt
-    const invite = prompts[prompts.length - 1];
-    if (invite) gsap.to(invite, { autoAlpha: 0, scale: 0, duration: 0.3 });
-
-    const clickTl = gsap.timeline({ defaults: { ease: "sine.inOut" } });
-
-    // Remove overlay
-    if (overlay) clickTl.to(overlay, { autoAlpha: 0, duration: 0.5 });
-
-    // Start shader beams
-    clickTl.add(revealShader, ">");
-
-    // Dissolve temple (with 0.5 sec delay)
-    if (temple) clickTl.to(temple, { autoAlpha: 0, duration: 0.9 }, ">+0.5");
-
-    // Scale Metatron up
-    if (metatron) {
-      clickTl.fromTo(
-        metatron, 
-        { scale: 1 }, 
-        { scale: 1.25, duration: 1.2 }, 
-        ">-0.7"
-      );
+    
+    const entryTl = gsap.timeline({
+      defaults: { ease: "sine.inOut" }
+    });
+    
+    // Hide current prompt
+    const currentPrompt = DOM.prompts[State.currentPromptIndex];
+    if (currentPrompt) {
+      entryTl.to(currentPrompt, { autoAlpha: 0, scale: 0, duration: 0.4 });
     }
-
-    // Goddess glides in gracefully (like Guild Navigators in Dune)
-    if (goddess) {
-      clickTl.fromTo(
-        goddess,
+    
+    // Remove overlay
+    if (DOM.overlay) {
+      entryTl.to(DOM.overlay, { autoAlpha: 0, duration: 0.5 }, "<");
+    }
+    
+    // Start shader
+    entryTl.add(revealShader, ">");
+    
+    // Dissolve temple
+    if (DOM.temple) {
+      entryTl.to(DOM.temple, { autoAlpha: 0, duration: 0.9 }, ">+0.3");
+    }
+    
+    // Goddess glides in
+    if (DOM.goddess) {
+      entryTl.fromTo(
+        DOM.goddess,
         {
           autoAlpha: 0,
-          y: "-16vh",  // Start from above
-          scale: 0.85,
-          transformOrigin: "50% 50%"
+          y: "-16vh",
+          scale: 0.85
         },
         {
           autoAlpha: 1,
@@ -395,173 +466,103 @@ document.addEventListener("DOMContentLoaded", () => {
           scale: 1,
           duration: 1.8,
           ease: "power1.inOut",
-          pointerEvents: "none",  // not clickable yet
-          onStart: () => console.log("🌙 Goddess gliding into position")
+          pointerEvents: "none",
+          onStart: () => console.log("🌙 Goddess gliding in")
         },
-        ">-0.6" // overlap with Metatron zoom for smooth flow
+        ">-0.4"
       );
     }
-
-    // 🎵 Audio fade up - Start oracle scene audio
-    clickTl.add(async () => {
-      if (!bg) {
-        console.error("❌ No audio element found");
-        return;
-      }
-      
-      const volumeLevel = window.AHAudioState?.VOLUME_LEVEL || 0.35;
-      
-      if (oracleAudioUrl && bg.src !== oracleAudioUrl) {
-        console.log("🔄 Re-setting audio source:", oracleAudioUrl);
-        bg.src = oracleAudioUrl;
-        await new Promise(resolve => setTimeout(resolve, 200));
-      }
-      
-      console.log("🎵 Attempting to play audio");
-      
-      try {
-        bg.currentTime = 0;
-        bg.volume = 0;
-        bg.muted = false;
-        
-        await bg.play();
-        console.log("✅ Audio play succeeded");
-        
-        gsap.to(bg, { volume: volumeLevel, duration: 1.0 });
-        
-        if (window.AHAudioState) {
-          window.AHAudioState.setState(true, volumeLevel);
-        }
-        
-        if (icon) gsap.to(icon, { opacity: 1, duration: 0.4 });
-        
-        console.log("🎵 Oracle audio started");
-      } catch (e) {
-        console.error("❌ Audio play failed:", e.message);
-        if (window.AHAudioState) window.AHAudioState.setState(false);
-        if (icon) gsap.set(icon, { opacity: 0.4 });
-      }
-    }, "<");
-
-    // Show audio UI
-    clickTl.to(audioUI, { 
+    
+    // Show audio UI (audio OFF, user enables manually)
+    entryTl.to(DOM.audioUI, { 
       autoAlpha: 1, 
       duration: 0.4, 
       onStart: () => {
-        gsap.set(audioUI, { pointerEvents: "auto" });
+        gsap.set(DOM.audioUI, { pointerEvents: "auto" });
+        console.log("🎛️ Audio UI visible (audio OFF - user must enable)");
       }
     });
-
-    // At the very end of entry:
-    clickTl.add(() => {
-      console.log("✅ Entry sequence complete - enabling Metatron center + starting facet loop");
-      enableMetatronNavigation();
-      startFacetLoop();
+    
+    // Begin divination sequence
+    entryTl.add(() => {
+      console.log("🔮 Starting divination sequence");
+      divinationSequence();
     }, ">");
   }
 
-  // ------- DIVINATION SEQUENCE (center click) -------
-  async function divinationSequence() {
-    if (divinationStarted) return;
-    divinationStarted = true;
-
-    console.log("🎯 Metatron center clicked - Beginning divination sequence");
-
-    const metatronCenter = document.getElementById("P_C");
-    if (metatronCenter) {
-      gsap.killTweensOf(metatronCenter); // Stop pulse
-      gsap.set(metatronCenter, { pointerEvents: "none" });
-    }
-
-    // Stop facet loop
-    stopFacetLoop();
-
-    // Select random scene using weighted selection (excludes opening)
+  // ============================================================
+  // DIVINATION SEQUENCE
+  // ============================================================
+  
+  function divinationSequence() {
+    console.log("🎯 Divination sequence starting");
+    
     const nextScene = selectRandomScene();
     
     if (!nextScene) {
-      console.error('❌ No scene available for navigation!');
-      // Fallback to hardcoded URL (ensure it's NOT the opening)
+      console.error('❌ No scene available!');
       window.location.href = "/scenes/surrender-01";
       return;
     }
-
+    
+    // Save to history
+    saveToHistory('opening-entry');
+    
     const divinationTl = gsap.timeline({ 
       defaults: { ease: "sine.inOut" },
       onComplete: () => {
-        console.log("🌀 Divination complete - Navigating to:", nextScene.url);
+        console.log("🌀 Navigating to:", nextScene.url);
         window.location.href = nextScene.url;
       }
     });
-
-    // 1) Fade out title
-    if (title) {
-      divinationTl.to(title, {
+    
+    // Fade title
+    if (DOM.title) {
+      divinationTl.to(DOM.title, {
         autoAlpha: 0,
         duration: 0.8,
-        ease: "power2.in",
-        onStart: () => console.log("📝 Title dissolving")
+        ease: "power2.in"
       });
     }
-
-    // 2) Goddess drops + scales down and parks at bottom (relative move)
-    if (goddess) {
+    
+    // Goddess drops to dock
+    if (DOM.goddess) {
       divinationTl.to(
-        goddess,
+        DOM.goddess,
         {
-          y: "+=19vh",      // drop down from current position
-          scale: 0.5,       // shrink into dock size
+          y: "+=19vh",
+          scale: 0.5,
           duration: 1.4,
           ease: "power2.inOut",
-          onStart: () => console.log("🌙 Goddess dropping to dock"),
-          onComplete: () => {
-            console.log("✅ Goddess docked");
-            gsap.set(goddess, { pointerEvents: "auto" }); // now usable as nav glyph
-          }
+          onStart: () => console.log("🌙 Goddess dropping to dock")
         },
-        "<" // overlap with title fade
+        "<"
       );
     }
-
-    // 3) Metatron shrinks to center while shader fades
-    if (metatron) {
-      divinationTl.to(metatron, {
+    
+    // Metatron shrinks and spins
+    if (DOM.metatron) {
+      divinationTl.to(DOM.metatron, {
         scale: 0.01,
         rotation: "+=720",
         duration: 2.6,
         ease: "power2.in",
         transformOrigin: "50% 50%",
         force3D: true,
-        onStart: () => {
-          console.log("🌀 Metatron shrinking and spinning to center");
-        },
-        onComplete: () => {
-          console.log("✅ Metatron shrunk to center");
-        }
+        onStart: () => console.log("🌀 Metatron divination spiral")
       }, "-=0.4");
       
-      // Fade audio when Metatron reaches ~30% of animation (0.78s into 2.6s)
-      if (bg) {
-        divinationTl.to(bg, {
-          volume: 0,
-          duration: 1.0,
-          ease: "power2.in",
-          onStart: () => console.log("🔇 Fading audio for smooth transition")
-        }, "-=1.82"); // Positions fade to start 0.78s into Metatron animation (~30%)
-      }
-      
-      // Fade shader at same timing as audio (30% of Metatron animation)
-      if (shaderW) {
-        divinationTl.to(shaderW, {
+      // Fade shader
+      if (DOM.shaderW) {
+        divinationTl.to(DOM.shaderW, {
           autoAlpha: 0,
           duration: 1.4,
-          ease: "power2.in",
-          onStart: () => console.log("💫 Fading shader for smooth transition")
-        }, "-=1.82"); // Same timing as audio fade
+          ease: "power2.in"
+        }, "-=1.82");
       }
     }
-
-    // 4) Fade out inner Metatron shapes a bit after shrink starts
+    
+    // Fade Metatron shapes
     divinationTl.add(() => {
       const allShapes = document.querySelectorAll("#metatron polygon, #metatron polyline");
       gsap.to(allShapes, {
@@ -570,125 +571,119 @@ document.addEventListener("DOMContentLoaded", () => {
         ease: "power2.in"
       });
     }, "-=2.0");
-
-    // 5) Brief hold with goddess as the only visible anchor
-    divinationTl.to({}, { 
-      duration: 0.7,
-      onStart: () => {
-        console.log("🌙 Final state - Triple Goddess parked as navigation glyph");
-      }
-    });
+    
+    divinationTl.to({}, { duration: 0.7 });
   }
 
-  // ------- Enable Metatron Center Navigation -------
-  function enableMetatronNavigation() {
-    const metatronCenter = document.getElementById("P_C");
-    if (!metatronCenter) {
-      console.warn("⚠️ Metatron center (P_C) not found");
-      return;
+  // ============================================================
+  // EVENT HANDLERS
+  // ============================================================
+  
+  function handleWheel(e) {
+    if (!State.inPromptMode || !State.canNavigate || State.enteredOracle) return;
+    
+    e.preventDefault();
+    
+    if (e.deltaY < 0) {
+      console.log("⬆️ Scroll up detected");
+      navigateBackward();
+    } else if (e.deltaY > 0) {
+      console.log("⬇️ Scroll down detected");
+      navigateForward();
     }
-    
-    // Make it clickable
-    gsap.set(metatronCenter, {
-      cursor: "pointer",
-      pointerEvents: "auto",
-      opacity: 0.8
-    });
-    
-    // Gentle pulse to indicate interactivity
-    gsap.to(metatronCenter, {
-      opacity: 1,
-      scale: 1.05,
-      duration: 1.5,
-      repeat: -1,
-      yoyo: true,
-      ease: "sine.inOut",
-      transformOrigin: "center center"
-    });
-    
-    // Hover effect
-    metatronCenter.addEventListener("mouseenter", () => {
-      gsap.to(metatronCenter, {
-        scale: 1.12,
-        opacity: 1,
-        duration: 0.3,
-        overwrite: true
-      });
-    });
-    
-    metatronCenter.addEventListener("mouseleave", () => {
-      gsap.to(metatronCenter, {
-        scale: 1.05,
-        opacity: 1,
-        duration: 0.3,
-        repeat: -1,
-        yoyo: true
-      });
-    });
-    
-    // CLICK triggers divination sequence
-    metatronCenter.addEventListener("click", (e) => {
-      e.stopPropagation();
-      divinationSequence();
-    });
-    
-    console.log("🎯 Metatron center now clickable - click to begin divination");
   }
-
-  // ------- Click Handler for Entry (general enter) -------
-  document.addEventListener("click", (e) => {
-    if (!readyForClick) return;
-
+  
+  function handleTouchStart(e) {
+    if (!State.inPromptMode || State.enteredOracle) return;
+    State.touchStartY = e.touches[0].clientY;
+    State.touchStartX = e.touches[0].clientX;
+  }
+  
+  function handleTouchEnd(e) {
+    if (!State.canNavigate || !State.inPromptMode || State.enteredOracle) return;
+    
+    const touchEndY = e.changedTouches[0].clientY;
+    const touchEndX = e.changedTouches[0].clientX;
+    
+    const deltaY = State.touchStartY - touchEndY;
+    const deltaX = Math.abs(State.touchStartX - touchEndX);
+    
+    if (Math.abs(deltaY) < CONFIG.swipeMinDistance) return;
+    if (deltaX > Math.abs(deltaY)) return;
+    
+    if (deltaY > 0) {
+      console.log("👆 Swipe up detected");
+      navigateForward();
+    } else {
+      console.log("👇 Swipe down detected");
+      navigateBackward();
+    }
+  }
+  
+  function handleClick(e) {
+    if (!State.inPromptMode || !State.canNavigate || State.enteredOracle) return;
+    
     // Ignore clicks on UI elements
-    if (audioUI && audioUI.contains(e.target)) return;
-    if (goddess && goddess.contains(e.target)) return;
-
-    enterSequence();
-  });
-
-  // ------- Audio Toggle Control (Persistent) -------
-  audioToggle?.addEventListener("click", async (e) => {
+    if (DOM.audioUI && DOM.audioUI.contains(e.target)) return;
+    if (DOM.goddess && DOM.goddess.contains(e.target)) return;
+    if (DOM.audioToggle && DOM.audioToggle.contains(e.target)) return;
+    
+    // Determine click zone
+    const clickY = e.clientY;
+    const windowHeight = window.innerHeight;
+    const topZone = windowHeight * 0.5;
+    
+    if (clickY < topZone) {
+      console.log("👆 Top zone clicked - navigate backward");
+      navigateBackward();
+    } else {
+      console.log("👇 Bottom zone clicked - navigate forward");
+      navigateForward();
+    }
+  }
+  
+  async function handleAudioToggle(e) {
     e.stopPropagation();
-    if (!bg) return;
+    if (!DOM.bg) return;
+    
+    console.log("🎵 Audio toggle clicked");
     
     if (window.AHAudioState) {
-      await window.AHAudioState.toggle(bg, icon);
+      await window.AHAudioState.toggle(DOM.bg, DOM.audioIcon);
     } else {
-      console.warn("⚠️ AHAudioState not found, using local toggle");
-      const isPlaying = !bg.paused;
+      const isPlaying = !DOM.bg.paused;
       
       if (isPlaying) {
-        gsap.to(bg, { volume: 0, duration: 0.3, onComplete: () => bg.pause() });
-        if (icon) gsap.to(icon, { opacity: 0.4, duration: 0.3 });
+        gsap.to(DOM.bg, { 
+          volume: 0, 
+          duration: 0.3, 
+          onComplete: () => DOM.bg.pause() 
+        });
+        if (DOM.audioIcon) gsap.to(DOM.audioIcon, { opacity: 0.4, duration: 0.3 });
       } else {
         try {
-          if (bg.paused) await bg.play();
-          gsap.to(bg, { volume: 0.35, duration: 0.3 });
-          if (icon) gsap.to(icon, { opacity: 1, duration: 0.3 });
+          if (DOM.bg.paused) await DOM.bg.play();
+          gsap.to(DOM.bg, { volume: CONFIG.audioVolume, duration: 0.3 });
+          if (DOM.audioIcon) gsap.to(DOM.audioIcon, { opacity: 1, duration: 0.3 });
         } catch (err) {
           console.warn("Audio play failed:", err);
         }
       }
     }
-  });
+  }
 
-  // ------- Triple Goddess Navigation Toggle (post-dock) -------
-  goddess?.addEventListener("click", (e) => {
-    e.stopPropagation();
-    console.log("🌙 Goddess navigation toggle clicked");
-    
-    const fullCircle = document.querySelector("#triple-goddess #full-circle");
-    if (fullCircle) {
-      gsap.to(fullCircle, {
-        scale: 1.15,
-        duration: 0.2,
-        yoyo: true,
-        repeat: 1,
-        transformOrigin: "50% 50%",
-        ease: "power2.inOut"
-      });
-    }
-    
-    console.log("🔍 Navigation toggle (behavior to be implemented)");
-  });
+  // ============================================================
+  // ATTACH LISTENERS
+  // ============================================================
+  
+  window.addEventListener('wheel', handleWheel, { passive: false });
+  window.addEventListener('touchstart', handleTouchStart, { passive: true });
+  window.addEventListener('touchend', handleTouchEnd, { passive: true });
+  document.addEventListener('click', handleClick);
+  
+  if (DOM.audioToggle) {
+    DOM.audioToggle.addEventListener('click', handleAudioToggle);
+  }
+
+  console.log("✅ Entry sequence ready - title animation will begin");
 });
