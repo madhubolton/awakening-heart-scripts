@@ -47,11 +47,12 @@ window.AHLights = (() => {
     }
   };
   
-  // Step groups for progressive lighting
+  // Step groups for progressive lighting (4 prompts = 4 steps)
   const STEP_GROUPS = [
-    ['floor', 'riser1', 'step1'],           // Step 1 (prompt 1)
-    ['riser2', 'step2'],                     // Step 2 (prompt 2)
-    ['plinthFace', 'plinthTop']              // Step 3 (prompt 3)
+    ['floor', 'riser1'],                     // Step 1 (prompt 1) - bottom riser
+    ['step1', 'riser2'],                     // Step 2 (prompt 2) - second step/riser
+    ['step2', 'plinthFace'],                 // Step 3 (prompt 3) - third step/riser
+    ['plinthTop']                            // Step 4 (prompt 4) - plinth top
   ];
   
   let currentStepIndex = -1; // -1 = all neutral (prompt0 visible)
@@ -131,6 +132,15 @@ window.AHLights = (() => {
    * - promptIndex 1: step 0 lit
    * - promptIndex 2: steps 0-1 lit
    * - promptIndex 3: steps 0-2 lit (all lit)
+   */
+  /**
+   * Navigate to specific step (called by entry sequence)
+   * Maps prompt index to step lighting:
+   * - promptIndex 0 (Welcome): no steps lit (all grey)
+   * - promptIndex 1: step 0 lit (bottom step/riser violet)
+   * - promptIndex 2: steps 0-1 lit (second step/riser violet)
+   * - promptIndex 3: steps 0-2 lit (third step/riser violet)
+   * - promptIndex 4: steps 0-3 lit (plinth top violet - all lit)
    */
   const navigateToPrompt = (promptIndex) => {
     if (!entryMode) return;
