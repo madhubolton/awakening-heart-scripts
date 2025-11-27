@@ -1,14 +1,17 @@
 /*--------------------------------------------------------------
-  Awakening Heart : Oracle Scene Controller v3.2
-  Version: 3.2.0 | Date: 2025-11-20
+  Awakening Heart : Oracle Scene Controller
+  Version: 4.0.0 | Date: 2025-11-27
   
-  FIXES in v3.2:
+  CHANGES in v4.0:
+  - Click navigation with top/bottom zones (top=back, bottom=forward)
+  - Metatron breathes out on scene entry (consistent with content blocks)
+  - Enhanced randomizer debugging
   - Skips empty content blocks during navigation
-  - Only includes blocks with actual text content
+  - No audio autoplay - user enables manually
   
   COMPLETE CYCLICAL FLOW:
-  Entry Scene â†’ Divination â†’ New Scene Entry â†’ Content Navigation â†’ 
-  Meditation Mode â†’ Divination â†’ (cycle repeats)
+  Entry Scene → Divination → New Scene Entry → Content Navigation → 
+  Meditation Mode → Divination → (cycle repeats)
 --------------------------------------------------------------*/
 
 (function() {
@@ -19,44 +22,25 @@
   // ============================================================
   
   const CONFIG = {
-    // Breathing animation timing (in seconds)
     breathIn: 0.8,
     breathPause: 0.2,
     breathOut: 1.2,
-    
-    // Navigation cooldown (in milliseconds)
     scrollCooldown: 300,
-    
-    // Audio volumes and fade durations
     audioVolume: 0.35,
     audioFadeDuration: 1.0,
     breathDuckAmount: 0.15,
-    
-    // Goddess positions and scales
     goddessDockY: '20vh',
     goddessDockScale: 0.5,
     goddessCenterY: 0,
     goddessCenterScale: 1.0,
-    
-    // Metatron states
     metatronContentOpacity: 0.3,
     metatronMeditationOpacity: 1.0,
     metatronScale: 1.25,
-    
-    // Scene entry animation timing
     sceneEntryDuration: 2.0,
-    metatronSpiralDuration: 1.6,
-    
-    // Meditation mode transition timing
+    metatronBreatheDuration: 1.2,
     meditationTransitionDuration: 1.4,
-    
-    // Divination animation timing
     divinationDuration: 2.6,
-    
-    // Touch swipe detection
     swipeMinDistance: 50,
-    
-    // LocalStorage keys
     storageKeys: {
       sceneHistory: 'ah_scene_history',
       lastContentBlock: 'ah_last_content_block',
@@ -75,14 +59,11 @@
     canScroll: true,
     lastContentBlockBeforeMeditation: 0,
     sceneEntryComplete: false,
-    
     touchStartY: 0,
     touchStartX: 0,
-    
     backgroundAudio: null,
     meditationAudio: null,
     breathAudio: null,
-    
     facetAnimation: null,
     isTransitioning: false
   };
@@ -93,22 +74,12 @@
   
   let DOM = {};
   
-  /**
-   * Check if a content block has meaningful content
-   */
   function hasContent(element) {
     if (!element) return false;
-    
-    // Get text content and trim whitespace
     const text = element.textContent?.trim() || '';
-    
-    // Check if there's actual text
     if (text.length > 0) return true;
-    
-    // Check for images or other visible content
     const hasImages = element.querySelector('img') !== null;
     const hasSvg = element.querySelector('svg') !== null;
-    
     return hasImages || hasSvg;
   }
   
@@ -142,7 +113,6 @@
       audioIcon: document.querySelector('#audioToggle svg, #audioToggle .icon-On')
     };
     
-    // Collect all potential content blocks
     const allBlocks = [
       DOM.intro,
       DOM.distinction,
@@ -156,10 +126,9 @@
       DOM.prompt4
     ];
     
-    // Filter to only include blocks with actual content
     State.contentBlocks = allBlocks.filter(hasContent);
     
-    console.log('ðŸ“¦ DOM cached:', {
+    console.log('📦 DOM cached:', {
       totalBlocks: allBlocks.length,
       blocksWithContent: State.contentBlocks.length,
       emptyBlocks: allBlocks.length - State.contentBlocks.length,
@@ -169,7 +138,6 @@
       shader: !!DOM.shader
     });
     
-    // Log which blocks have content
     const blockNames = ['intro', 'distinction', 'quote', 'share', 'practice', 
                         'prompt0', 'prompt1', 'prompt2', 'prompt3', 'prompt4'];
     const contentStatus = allBlocks.map((block, i) => ({
@@ -177,7 +145,7 @@
       hasContent: hasContent(block)
     }));
     
-    console.log('ðŸ“ Content blocks status:', contentStatus);
+    console.log('📝 Content blocks status:', contentStatus);
   }
 
   // ============================================================
@@ -198,21 +166,30 @@
         realm: item.dataset.realm
       };
     });
-    console.log('ðŸŽ² Scene pool loaded:', pool.length, 'scenes');
-    return pool;
+    
+    const validPool = pool.filter(s => s.url && s.url.startsWith('/scenes/') && s.id);
+    console.log('🎲 Scene pool loaded:', validPool.length, 'valid oracle scenes');
+    console.log('📋 Pool contents:', validPool.map(s => ({ id: s.id, weight: s.weight })));
+    
+    return validPool;
   }
   
   function getCurrentSceneId() {
     const path = window.location.pathname;
     const match = path.match(/\/scenes\/([^\/]+)/);
-    return match ? match[1] : null;
+    const id = match ? match[1] : null;
+    console.log('📍 Current scene ID:', id);
+    return id;
   }
   
   function getSceneHistory() {
     try {
       const stored = localStorage.getItem(CONFIG.storageKeys.sceneHistory);
-      return stored ? JSON.parse(stored) : [];
+      const history = stored ? JSON.parse(stored) : [];
+      console.log('📚 Scene history:', history);
+      return history;
     } catch (e) {
+      console.warn('⚠️ Could not read scene history:', e);
       return [];
     }
   }
@@ -225,9 +202,9 @@
         history = history.slice(-3);
       }
       localStorage.setItem(CONFIG.storageKeys.sceneHistory, JSON.stringify(history));
-      console.log('ðŸ’¾ Scene history updated:', history);
+      console.log('💾 Scene history updated:', history);
     } catch (e) {
-      console.warn('Could not save scene history:', e);
+      console.warn('⚠️ Could not save scene history:', e);
     }
   }
   
@@ -237,25 +214,41 @@
     const history = getSceneHistory();
     
     const excluded = [...history, currentId].filter(Boolean);
+    console.log('🚫 Excluding from selection:', excluded);
+    
     const available = pool.filter(scene => !excluded.includes(scene.id));
     
+    console.log('✅ Available scenes:', available.length, '/', pool.length);
+    console.log('📋 Available scene IDs:', available.map(s => s.id));
+    
     if (available.length === 0) {
+      console.warn('⚠️ No available scenes after exclusion - using fallback');
       const fallback = pool.filter(scene => scene.id !== currentId);
-      return fallback.length > 0 ? fallback[0] : null;
+      if (fallback.length > 0) {
+        console.log('🎯 Fallback scene:', fallback[0].id);
+        return fallback[0];
+      }
+      console.error('❌ No fallback available!');
+      return null;
     }
     
     const totalWeight = available.reduce((sum, scene) => sum + scene.weight, 0);
     let random = Math.random() * totalWeight;
     
+    console.log('🎰 Weighted random selection:', random.toFixed(2), '/', totalWeight.toFixed(2));
+    
     for (const scene of available) {
       random -= scene.weight;
       if (random <= 0) {
-        console.log('ðŸŽ¯ Next scene selected:', scene.id, `(weight: ${scene.weight})`);
+        console.log('🎯 Selected scene:', scene.id, `(weight: ${scene.weight})`);
+        console.log('📍 Navigating to:', scene.url);
         return scene;
       }
     }
     
-    return available[0];
+    const fallback = available[0];
+    console.log('🎯 Fallback to first available:', fallback.id);
+    return fallback;
   }
 
   // ============================================================
@@ -274,14 +267,15 @@
     if (window.AHAudioState) {
       try {
         await window.AHAudioState.initAudio(DOM.bgMusic, DOM.audioIcon, sceneAudioUrl);
-        console.log('ðŸŽµ Audio initialized with persistent state');
+        console.log('🎵 Audio initialized (OFF by default, user must enable)');
       } catch (e) {
-        console.warn('Audio init failed:', e);
+        console.warn('⚠️ Audio init failed:', e);
       }
     } else {
-      DOM.bgMusic.volume = CONFIG.audioVolume;
+      DOM.bgMusic.volume = 0;
+      DOM.bgMusic.pause();
       DOM.bgMusic.loop = true;
-      console.log('ðŸŽµ Audio initialized (no persistence)');
+      console.log('🎵 Audio initialized without state manager (OFF)');
     }
     
     if (State.meditationAudio) {
@@ -317,16 +311,19 @@
     });
     
     State.breathAudio.currentTime = 0;
-    State.breathAudio.play().catch(e => console.warn('Breath sound failed:', e));
+    State.breathAudio.play().catch(e => console.warn('⚠️ Breath sound failed:', e));
   }
   
   async function crossfadeToMeditation() {
     if (!State.meditationAudio) return;
     
     const audioState = window.AHAudioState ? window.AHAudioState.getState() : { isPlaying: !State.backgroundAudio.paused };
-    if (!audioState.isPlaying) return;
+    if (!audioState.isPlaying) {
+      console.log('⏭️ Skipping meditation crossfade - audio OFF');
+      return;
+    }
     
-    console.log('ðŸŽµ Crossfading to meditation audio');
+    console.log('🎵 Crossfading to meditation audio');
     
     try {
       State.meditationAudio.currentTime = 0;
@@ -344,14 +341,14 @@
         duration: CONFIG.audioFadeDuration
       });
     } catch (e) {
-      console.warn('Meditation audio crossfade failed:', e);
+      console.warn('⚠️ Meditation audio crossfade failed:', e);
     }
   }
   
   async function crossfadeToBackground() {
     if (!State.meditationAudio || State.meditationAudio.paused) return;
     
-    console.log('ðŸŽµ Crossfading back to background audio');
+    console.log('🎵 Crossfading back to background audio');
     
     try {
       State.backgroundAudio.currentTime = 0;
@@ -369,7 +366,7 @@
         duration: CONFIG.audioFadeDuration
       });
     } catch (e) {
-      console.warn('Background audio crossfade failed:', e);
+      console.warn('⚠️ Background audio crossfade failed:', e);
     }
   }
   
@@ -377,15 +374,15 @@
     if (!sfxElement) return;
     sfxElement.currentTime = 0;
     sfxElement.volume = 0.5;
-    sfxElement.play().catch(e => console.warn('SFX play failed:', e));
+    sfxElement.play().catch(e => console.warn('⚠️ SFX play failed:', e));
   }
 
   // ============================================================
-  // SCENE ENTRY ANIMATION
+  // SCENE ENTRY ANIMATION (Metatron breathes out)
   // ============================================================
   
   async function playSceneEntryAnimation() {
-    console.log('ðŸŽ¬ Playing scene entry animation');
+    console.log('🎬 Playing scene entry animation (Metatron breathes out)');
     
     return new Promise((resolve) => {
       const tl = gsap.timeline({
@@ -393,28 +390,26 @@
         onComplete: () => {
           State.sceneEntryComplete = true;
           State.canScroll = true;
-          console.log('âœ… Scene entry complete - content mode active');
-          resolve(); // Resolve promise when animation completes
+          console.log('✅ Scene entry complete - content mode active');
+          resolve();
         }
       });
       
-      // Metatron spirals UP from tiny center
+      // Metatron BREATHES OUT from tiny center (consistent with content blocks)
       if (DOM.metatron) {
         tl.fromTo(DOM.metatron,
           {
-            scale: 0.01,
-            rotation: 0,
+            scale: 0,
             autoAlpha: 0,
             transformOrigin: '50% 50%',
             force3D: true
           },
           {
             scale: CONFIG.metatronScale,
-            rotation: -720,
             autoAlpha: 1.0,
-            duration: CONFIG.metatronSpiralDuration,
+            duration: CONFIG.metatronBreatheDuration,
             ease: 'power2.out',
-            onStart: () => console.log('ðŸŒ€ Metatron spiraling up')
+            onStart: () => console.log('🌬️ Metatron breathing out')
           },
           0
         );
@@ -426,10 +421,10 @@
           { autoAlpha: 0 },
           {
             autoAlpha: 1,
-            duration: 1.2,
+            duration: 1.0,
             ease: 'sine.inOut'
           },
-          '-=1.0'
+          '-=0.8'
         );
       }
       
@@ -443,21 +438,21 @@
         });
       }
       
-      // Title appears
+      // Title breathes out
       if (DOM.title) {
         tl.fromTo(DOM.title,
           { autoAlpha: 0, scale: 0 },
           {
             autoAlpha: 1,
             scale: 1,
-            duration: 0.8,
+            duration: CONFIG.breathOut,
             ease: 'power2.out'
           },
           '-=0.4'
         );
       }
       
-      // First content block breathes OUT (if any exist)
+      // First content block breathes out
       const firstBlock = State.contentBlocks[0];
       if (firstBlock) {
         tl.fromTo(firstBlock,
@@ -472,12 +467,11 @@
           '-=0.2'
         );
       } else {
-        console.log('â„¹ï¸ No content blocks to animate');
+        console.log('ℹ️ No content blocks to animate');
       }
       
-      // If timeline is empty, resolve immediately
       if (tl.totalDuration() === 0) {
-        console.warn('âš ï¸ Scene entry timeline is empty, resolving immediately');
+        console.warn('⚠️ Scene entry timeline is empty, resolving immediately');
         State.sceneEntryComplete = true;
         State.canScroll = true;
         resolve();
@@ -490,6 +484,7 @@
   // ============================================================
   
   function breatheIn(element) {
+    console.log('🌬️ Content breathing in');
     return gsap.to(element, {
       scale: 0,
       duration: CONFIG.breathIn,
@@ -499,6 +494,7 @@
   }
   
   function breatheOut(element) {
+    console.log('🌬️ Content breathing out');
     return gsap.fromTo(element,
       { scale: 0, autoAlpha: 1 },
       {
@@ -511,8 +507,14 @@
   }
   
   function navigateToBlock(targetIndex) {
-    if (State.isTransitioning) return;
-    if (targetIndex < 0 || targetIndex >= State.contentBlocks.length) return;
+    if (State.isTransitioning) {
+      console.log('⏳ Navigation blocked - transition in progress');
+      return;
+    }
+    if (targetIndex < 0 || targetIndex >= State.contentBlocks.length) {
+      console.log('🚫 Invalid block index:', targetIndex);
+      return;
+    }
     
     State.isTransitioning = true;
     State.canScroll = false;
@@ -520,7 +522,7 @@
     const currentBlock = State.contentBlocks[State.currentBlockIndex];
     const nextBlock = State.contentBlocks[targetIndex];
     
-    console.log(`ðŸ“– Navigating: ${State.currentBlockIndex} â†’ ${targetIndex}`);
+    console.log(`📖 Navigating blocks: ${State.currentBlockIndex} → ${targetIndex}`);
     
     const tl = gsap.timeline({
       onComplete: () => {
@@ -528,6 +530,7 @@
         State.isTransitioning = false;
         setTimeout(() => {
           State.canScroll = true;
+          console.log('✅ Navigation ready');
         }, CONFIG.scrollCooldown);
       }
     });
@@ -546,11 +549,13 @@
   }
   
   function navigateForward() {
-    if (!State.canScroll || State.inMeditation || !State.sceneEntryComplete) return;
+    if (!State.canScroll || State.inMeditation || !State.sceneEntryComplete) {
+      console.log('⏸️ Forward navigation blocked');
+      return;
+    }
     
-    // If no content blocks, enter meditation immediately
     if (State.contentBlocks.length === 0) {
-      console.log('ðŸ“¿ No content available - entering meditation');
+      console.log('🧘 No content available - entering meditation');
       enterMeditationMode();
       return;
     }
@@ -558,7 +563,7 @@
     const nextIndex = State.currentBlockIndex + 1;
     
     if (nextIndex >= State.contentBlocks.length) {
-      console.log('ðŸ“¿ Reached end of content - entering meditation');
+      console.log('🧘 Reached end of content - entering meditation');
       enterMeditationMode();
       return;
     }
@@ -567,18 +572,20 @@
   }
   
   function navigateBackward() {
-    if (!State.canScroll || State.inMeditation || !State.sceneEntryComplete) return;
+    if (!State.canScroll || State.inMeditation || !State.sceneEntryComplete) {
+      console.log('⏸️ Backward navigation blocked');
+      return;
+    }
     
-    // If no content blocks, do nothing
     if (State.contentBlocks.length === 0) {
-      console.log('ðŸ”’ No content available');
+      console.log('ℹ️ No content available');
       return;
     }
     
     const prevIndex = State.currentBlockIndex - 1;
     
     if (prevIndex < 0) {
-      console.log('ðŸ”’ Already at first block');
+      console.log('🚫 Already at first block');
       return;
     }
     
@@ -592,7 +599,7 @@
   function startFacetAnimation() {
     if (!window.metatron || !window.AHCONFIG) return;
     
-    console.log('âœ¨ Starting facet animation pattern');
+    console.log('✨ Starting facet animation pattern');
     
     const facetConfig = window.AHCONFIG.facets || {
       pattern: 'sequential',
@@ -626,7 +633,7 @@
   
   function stopFacetAnimation() {
     if (window.metatron && window.metatron.stopFacets) {
-      console.log('ðŸ›‘ Stopping facet animation');
+      console.log('🛑 Stopping facet animation');
       window.metatron.stopFacets();
     }
   }
@@ -634,7 +641,7 @@
   function enterMeditationMode() {
     if (State.inMeditation || !State.sceneEntryComplete) return;
     
-    console.log('ðŸ§˜ Entering meditation mode');
+    console.log('🧘 Entering meditation mode');
     
     State.lastContentBlockBeforeMeditation = State.currentBlockIndex;
     State.inMeditation = true;
@@ -644,18 +651,17 @@
       localStorage.setItem(CONFIG.storageKeys.lastContentBlock, State.currentBlockIndex);
       localStorage.setItem(CONFIG.storageKeys.inMeditation, 'true');
     } catch (e) {
-      console.warn('Could not save meditation state:', e);
+      console.warn('⚠️ Could not save meditation state:', e);
     }
     
     const tl = gsap.timeline({
       defaults: { ease: 'power2.inOut' },
       onComplete: () => {
-        console.log('âœ… Meditation mode active');
+        console.log('✅ Meditation mode active');
         enableCenterDivination();
       }
     });
     
-    // Hide current content
     const currentBlock = State.contentBlocks[State.currentBlockIndex];
     if (currentBlock) {
       tl.to(currentBlock, {
@@ -666,18 +672,16 @@
       }, 0);
     }
     
-    // Goddess rises to center
     if (DOM.goddess) {
       tl.to(DOM.goddess, {
         y: CONFIG.goddessCenterY,
         scale: CONFIG.goddessCenterScale,
         duration: CONFIG.meditationTransitionDuration,
         ease: 'power2.inOut',
-        onStart: () => console.log('ðŸŒ™ Goddess rising to center')
+        onStart: () => console.log('🌙 Goddess rising to center')
       }, 0.2);
     }
     
-    // Metatron brightens
     if (DOM.metatron) {
       tl.to(DOM.metatron, {
         opacity: CONFIG.metatronMeditationOpacity,
@@ -687,7 +691,6 @@
       }, 0.3);
     }
     
-    // Ensure title visible
     if (DOM.title) {
       const titleVisible = gsap.getProperty(DOM.title, 'autoAlpha') > 0.5;
       if (!titleVisible) {
@@ -711,20 +714,19 @@
   function exitMeditationMode() {
     if (!State.inMeditation) return;
     
-    console.log('ðŸ“– Exiting meditation mode');
+    console.log('📖 Exiting meditation mode');
     
     disableCenterDivination();
     stopFacetAnimation();
     
     let returnIndex = State.lastContentBlockBeforeMeditation;
     
-    // If we were at the last block, loop back to prompt0
     const finalPromptIndex = State.contentBlocks.length - 1;
     if (State.lastContentBlockBeforeMeditation === finalPromptIndex) {
       const prompt0Index = State.contentBlocks.findIndex(block => block === DOM.prompt0);
       if (prompt0Index !== -1) {
         returnIndex = prompt0Index;
-        console.log('ðŸ”„ Returning to Prompt0');
+        console.log('🔄 Returning to Prompt0');
       }
     }
     
@@ -734,7 +736,7 @@
     try {
       localStorage.setItem(CONFIG.storageKeys.inMeditation, 'false');
     } catch (e) {
-      console.warn('Could not save meditation state:', e);
+      console.warn('⚠️ Could not save meditation state:', e);
     }
     
     const tl = gsap.timeline({
@@ -742,11 +744,10 @@
       onComplete: () => {
         State.currentBlockIndex = returnIndex;
         State.canScroll = true;
-        console.log('âœ… Returned to content');
+        console.log('✅ Returned to content');
       }
     });
     
-    // Goddess drops to dock
     if (DOM.goddess) {
       tl.to(DOM.goddess, {
         y: CONFIG.goddessDockY,
@@ -756,7 +757,6 @@
       }, 0);
     }
     
-    // Metatron dims
     if (DOM.metatron) {
       tl.to(DOM.metatron, {
         opacity: CONFIG.metatronContentOpacity,
@@ -780,11 +780,11 @@
   
   function enableCenterDivination() {
     if (!DOM.metatronCenter) {
-      console.warn('âš ï¸ Metatron center (P_C) not found');
+      console.warn('⚠️ Metatron center (P_C) not found');
       return;
     }
     
-    console.log('ðŸŽ¯ Center divination enabled');
+    console.log('🎯 Center divination enabled');
     
     gsap.set(DOM.metatronCenter, {
       cursor: 'pointer',
@@ -814,7 +814,7 @@
   }
   
   function triggerDivination() {
-    console.log('ðŸ”® Divination triggered');
+    console.log('🔮 Divination triggered');
     
     playSfx(DOM.divinationSfx);
     disableCenterDivination();
@@ -823,7 +823,7 @@
     const nextScene = selectNextScene();
     
     if (!nextScene) {
-      console.error('âŒ No next scene available!');
+      console.error('❌ No next scene available!');
       return;
     }
     
@@ -835,12 +835,11 @@
     const tl = gsap.timeline({
       defaults: { ease: 'power2.inOut' },
       onComplete: () => {
-        console.log('ðŸŒ€ Navigating to:', nextScene.url);
+        console.log('🌀 Navigating to:', nextScene.url);
         window.location.href = nextScene.url;
       }
     });
     
-    // Drop goddess to dock if at center
     const goddessY = gsap.getProperty(DOM.goddess, 'y');
     const isGoddessAtCenter = (typeof goddessY === 'string' && goddessY === '0px') || goddessY === 0;
     
@@ -853,7 +852,6 @@
       });
     }
     
-    // Center ritual animation
     if (DOM.metatronCenter) {
       tl.to(DOM.metatronCenter, {
         scale: 1.5,
@@ -869,7 +867,6 @@
       });
     }
     
-    // Fade title
     if (DOM.title) {
       tl.to(DOM.title, {
         autoAlpha: 0,
@@ -879,7 +876,6 @@
       }, '-=0.6');
     }
     
-    // Fade shader
     if (DOM.shader) {
       tl.to(DOM.shader, {
         autoAlpha: 0,
@@ -888,7 +884,6 @@
       }, '-=1.0');
     }
     
-    // Metatron shrinks and spins
     if (DOM.metatron) {
       tl.to(DOM.metatron, {
         scale: 0.01,
@@ -900,7 +895,6 @@
       }, '-=1.8');
     }
     
-    // Fade Metatron shapes
     tl.add(() => {
       const allShapes = document.querySelectorAll('#metatron polygon, #metatron polyline');
       gsap.to(allShapes, {
@@ -923,8 +917,10 @@
     e.preventDefault();
     
     if (e.deltaY < 0) {
+      console.log('⬆️ Scroll up');
       navigateBackward();
     } else if (e.deltaY > 0) {
+      console.log('⬇️ Scroll down');
       navigateForward();
     }
   }
@@ -948,9 +944,32 @@
     if (deltaX > Math.abs(deltaY)) return;
     
     if (deltaY > 0) {
+      console.log('👆 Swipe up');
       navigateForward();
     } else {
+      console.log('👇 Swipe down');
       navigateBackward();
+    }
+  }
+  
+  function handleClick(e) {
+    if (State.inMeditation || !State.canScroll || !State.sceneEntryComplete) return;
+    
+    // Ignore clicks on UI elements
+    if (DOM.audioToggle && DOM.audioToggle.contains(e.target)) return;
+    if (DOM.goddess && DOM.goddess.contains(e.target)) return;
+    
+    // Determine click zone
+    const clickY = e.clientY;
+    const windowHeight = window.innerHeight;
+    const topZone = windowHeight * 0.5;
+    
+    if (clickY < topZone) {
+      console.log('👆 Top zone clicked - navigate backward');
+      navigateBackward();
+    } else {
+      console.log('👇 Bottom zone clicked - navigate forward');
+      navigateForward();
     }
   }
   
@@ -959,7 +978,7 @@
     
     if (!State.sceneEntryComplete) return;
     
-    console.log('ðŸŒ™ Goddess clicked');
+    console.log('🌙 Goddess clicked');
     playSfx(DOM.goddessClickSfx);
     
     const fullCircle = DOM.goddess.querySelector('#full-circle');
@@ -986,7 +1005,7 @@
     
     if (!State.inMeditation || !State.sceneEntryComplete) return;
     
-    console.log('ðŸŽ¯ Center clicked');
+    console.log('🎯 Center clicked');
     playSfx(DOM.centerClickSfx);
     
     triggerDivination();
@@ -1000,6 +1019,8 @@
       : State.backgroundAudio;
     
     if (!activeAudio) return;
+    
+    console.log('🎵 Audio toggle clicked');
     
     if (window.AHAudioState) {
       await window.AHAudioState.toggle(activeAudio, DOM.audioIcon);
@@ -1054,7 +1075,7 @@
             gsap.to(DOM.audioIcon, { opacity: 1, duration: 0.3 });
           }
         } catch (err) {
-          console.warn('Audio play failed:', err);
+          console.warn('⚠️ Audio play failed:', err);
         }
       }
     }
@@ -1065,9 +1086,9 @@
   // ============================================================
   
   function setupInitialState() {
-    console.log('ðŸŽ¬ Setting up initial scene state');
+    console.log('🎬 Setting up initial scene state');
     
-    // CRITICAL: Immediately hide all content blocks to prevent flash
+    // Hide all content blocks
     State.contentBlocks.forEach((block) => {
       if (block) {
         block.style.visibility = 'hidden';
@@ -1076,7 +1097,7 @@
       }
     });
     
-    // Goddess at dock (matches entry scene end)
+    // Goddess at dock
     if (DOM.goddess) {
       gsap.set(DOM.goddess, {
         y: CONFIG.goddessDockY,
@@ -1087,15 +1108,15 @@
         transformOrigin: '50% 50%',
         zIndex: 50
       });
-      console.log('ðŸŒ™ Goddess initialized at dock position');
+      console.log('🌙 Goddess at dock position');
     }
     
-    // Metatron tiny at center (ready to spiral up)
+    // Metatron tiny at center (ready to breathe out)
     if (DOM.metatron) {
       gsap.set(DOM.metatron, {
         y: 0,
         x: 0,
-        scale: 0.01,
+        scale: 0,
         autoAlpha: 0,
         rotation: 0,
         transformOrigin: '50% 50%',
@@ -1104,21 +1125,18 @@
         pointerEvents: 'none'
       });
       
-      // Ensure Metatron shapes don't block interaction
       const metatronShapes = DOM.metatron.querySelectorAll('polygon, polyline, path, circle');
       metatronShapes.forEach(shape => {
         gsap.set(shape, { pointerEvents: 'none' });
       });
       
-      console.log('ðŸŒ€ Metatron initialized at tiny center');
+      console.log('🌀 Metatron ready to breathe out');
     }
     
-    // Title hidden
     if (DOM.title) {
       gsap.set(DOM.title, { autoAlpha: 0, scale: 0 });
     }
     
-    // Shader hidden
     if (DOM.shader) {
       gsap.set(DOM.shader, { 
         autoAlpha: 0,
@@ -1126,7 +1144,6 @@
       });
     }
     
-    // Center disabled
     if (DOM.metatronCenter) {
       gsap.set(DOM.metatronCenter, {
         pointerEvents: 'none',
@@ -1140,20 +1157,21 @@
   }
   
   function attachEventListeners() {
-    console.log('ðŸ”— Attaching event listeners');
+    console.log('🔗 Attaching event listeners');
     
     window.addEventListener('wheel', handleWheel, { passive: false });
     window.addEventListener('touchstart', handleTouchStart, { passive: true });
     window.addEventListener('touchend', handleTouchEnd, { passive: true });
+    window.addEventListener('click', handleClick);
     
     if (DOM.goddess) {
       DOM.goddess.addEventListener('click', handleGoddessClick);
-      console.log('âœ… Goddess click handler attached');
+      console.log('✅ Goddess click handler attached');
     }
     
     if (DOM.metatronCenter) {
       DOM.metatronCenter.addEventListener('click', handleCenterClick);
-      console.log('âœ… Center click handler attached');
+      console.log('✅ Center click handler attached');
     }
     
     if (DOM.audioToggle) {
@@ -1163,36 +1181,24 @@
   
   async function init() {
     try {
-      console.log('ðŸ’– Oracle Scene Controller v3.2 initializing...');
+      console.log('💖 Oracle Scene Controller v4.0 initializing...');
       
       cacheDOM();
-      
-      console.log('â³ Setting up initial state...');
       setupInitialState();
-      
-      console.log('â³ Initializing audio...');
       await initAudio();
-      
-      console.log('â³ Attaching event listeners...');
       attachEventListeners();
       
-      // Check if we have any content blocks
       if (State.contentBlocks.length === 0) {
-        console.warn('âš ï¸ No content blocks found - entering meditation mode directly');
-        
-        console.log('â³ Playing scene entry animation (no content)...');
+        console.warn('⚠️ No content blocks found - entering meditation mode directly');
         await playSceneEntryAnimation();
-        
-        // Auto-enter meditation mode since there's no content to navigate
         setTimeout(() => {
-          console.log('ðŸ§˜ Auto-entering meditation mode (no content available)');
+          console.log('🧘 Auto-entering meditation mode (no content available)');
           enterMeditationMode();
         }, 1000);
-        
         return;
       }
       
-      console.log('â³ About to play scene entry animation...');
+      console.log('⏳ Playing scene entry animation...');
       await playSceneEntryAnimation();
       
       if (window.metatron && window.AHCONFIG) {
@@ -1207,18 +1213,17 @@
         }
       }
       
-      console.log('âœ¨ Oracle Scene Controller ready - content mode active');
+      console.log('✨ Oracle Scene Controller ready');
     } catch (error) {
-      console.error('âŒ Scene controller initialization failed:', error);
+      console.error('❌ Scene controller initialization failed:', error);
       console.error('Stack trace:', error.stack);
       
-      // Attempt recovery - force play animation after short delay
-      console.log('ðŸ”„ Attempting recovery...');
+      console.log('🔄 Attempting recovery...');
       setTimeout(async () => {
         try {
           await playSceneEntryAnimation();
         } catch (e) {
-          console.error('âŒ Recovery failed:', e);
+          console.error('❌ Recovery failed:', e);
         }
       }, 500);
     }
@@ -1227,9 +1232,8 @@
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
   } else {
-    // Add small delay to ensure everything is ready after navigation
     if (document.referrer && document.referrer.includes(window.location.origin)) {
-      console.log('ðŸ”„ Detected internal navigation, adding initialization delay...');
+      console.log('🔄 Detected internal navigation, adding delay...');
       setTimeout(init, 100);
     } else {
       init();
@@ -1249,6 +1253,6 @@
     getDOM: () => DOM
   };
   
-  console.log('âœ… Scene controller API exposed');
+  console.log('✅ Scene controller API exposed');
 
 })();
