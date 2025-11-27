@@ -1,106 +1,93 @@
 /*--------------------------------------------------------------
-  Awakening Heart : Persistent Audio State Manager
-  Version: 2.0 | Date: 2025-10-31
+  Awakening Heart : Audio State Manager (Session Only)
+  Version: 3.0 | Date: 2025-11-27
   
-  Manages audio play/pause preference across scenes with different audio files.
-  Each scene has its own audio file - state tracks user preference, not playback position.
+  Simplified audio management - no localStorage persistence.
+  Audio starts OFF by default. User enables manually.
+  State only persists within current page session.
 --------------------------------------------------------------*/
 
 window.AHAudioState = (() => {
-  const STORAGE_KEY = 'ah_audio_state';
   const VOLUME_LEVEL = 0.35;
   
-  // Get current state from localStorage
+  // Session-only state (resets on page load)
+  let sessionState = {
+    isPlaying: false,
+    volume: VOLUME_LEVEL
+  };
+  
+  console.log('🎵 Audio State Manager initialized (session-only, no persistence)');
+  
+  // Get current session state
   const getState = () => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      return stored ? JSON.parse(stored) : { isPlaying: false, volume: VOLUME_LEVEL };
-    } catch (e) {
-      console.warn('Could not read audio state:', e);
-      return { isPlaying: false, volume: VOLUME_LEVEL };
-    }
+    return { ...sessionState };
   };
   
-  // Save state to localStorage
+  // Update session state
   const setState = (isPlaying, volume = VOLUME_LEVEL) => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ 
-        isPlaying, 
-        volume,
-        timestamp: Date.now()
-      }));
-    } catch (e) {
-      console.warn('Could not save audio state:', e);
-    }
+    sessionState = { 
+      isPlaying, 
+      volume,
+      timestamp: Date.now()
+    };
+    console.log('🎵 Audio state updated:', sessionState);
   };
   
-  // Clear state (useful for reset)
+  // Clear state (for cleanup)
   const clearState = () => {
-    try {
-      localStorage.removeItem(STORAGE_KEY);
-    } catch (e) {
-      console.warn('Could not clear audio state:', e);
-    }
+    sessionState = { isPlaying: false, volume: VOLUME_LEVEL };
+    console.log('🎵 Audio state cleared');
   };
   
-  // Initialize audio element with stored state
-  // This loads the scene's specific audio file and starts it if user preference is "playing"
+  // Initialize audio element - always starts paused
   const initAudio = async (audioElement, iconElement, sceneAudioUrl = null) => {
-    if (!audioElement) return false;
+    if (!audioElement) {
+      console.warn('⚠️ No audio element provided to initAudio');
+      return false;
+    }
     
-    const state = getState();
-    console.log('🎵 Restoring audio state:', state);
+    console.log('🎵 Initializing audio (starts OFF by default)');
     
     // If scene provides a specific audio URL, load it
     if (sceneAudioUrl) {
       console.log('🎼 Loading scene audio:', sceneAudioUrl);
       audioElement.src = sceneAudioUrl;
-      // Small delay to ensure audio is loaded
       await new Promise(resolve => setTimeout(resolve, 100));
     }
     
-    // Set icon appearance based on stored preference
+    // Set to paused state
+    audioElement.pause();
+    audioElement.volume = 0;
+    audioElement.currentTime = 0;
+    
+    // Set icon to OFF state
     if (iconElement) {
-      gsap.set(iconElement, { opacity: state.isPlaying ? 1.0 : 0.4 });
+      gsap.set(iconElement, { opacity: 0.4 });
     }
     
-    // Apply user's audio preference to this scene's audio
-    if (state.isPlaying) {
-      try {
-        audioElement.volume = 0;
-        audioElement.currentTime = 0; // Always start from beginning for new scene
-        await audioElement.play();
-        gsap.to(audioElement, { volume: state.volume, duration: 0.8 });
-        console.log('▶️ Scene audio started (per user preference)');
-        return true;
-      } catch (e) {
-        console.warn('Could not auto-start audio:', e);
-        // If autoplay fails, update state to paused
-        setState(false);
-        if (iconElement) gsap.set(iconElement, { opacity: 0.4 });
-        return false;
-      }
-    } else {
-      // User preference is to keep audio off
-      audioElement.pause();
-      audioElement.volume = 0;
-      console.log('⏸️ Scene audio paused (per user preference)');
-      return false;
-    }
+    setState(false, VOLUME_LEVEL);
+    console.log('✅ Audio initialized (paused, user must enable manually)');
+    
+    return false;
   };
   
-  // Toggle audio state for current scene
+  // Toggle audio state
   const toggle = async (audioElement, iconElement) => {
-    if (!audioElement) return false;
+    if (!audioElement) {
+      console.warn('⚠️ No audio element provided to toggle');
+      return false;
+    }
     
     const currentState = getState();
     const newState = !currentState.isPlaying;
     
+    console.log(`🎵 Audio toggle: ${currentState.isPlaying ? 'ON' : 'OFF'} → ${newState ? 'ON' : 'OFF'}`);
+    
     if (newState) {
-      // Turn ON - start current scene's audio
+      // Turn ON
       try {
         if (audioElement.paused) {
-          audioElement.currentTime = 0; // Start from beginning
+          audioElement.currentTime = 0;
           await audioElement.play();
         }
         gsap.to(audioElement, { volume: VOLUME_LEVEL, duration: 0.3 });
@@ -109,12 +96,12 @@ window.AHAudioState = (() => {
         console.log('🎵 Audio ON');
         return true;
       } catch (e) {
-        console.warn('Audio play failed:', e);
+        console.warn('❌ Audio play failed:', e);
         setState(false);
         return false;
       }
     } else {
-      // Turn OFF - pause current scene's audio
+      // Turn OFF
       gsap.to(audioElement, { 
         volume: 0, 
         duration: 0.3, 
@@ -127,20 +114,23 @@ window.AHAudioState = (() => {
     }
   };
   
-  // Crossfade between two audio elements (optional advanced feature)
+  // Crossfade between two audio elements (optional feature)
   const crossfade = async (fromAudio, toAudio, iconElement, duration = 1.0) => {
     if (!fromAudio || !toAudio) return false;
     
     const state = getState();
-    if (!state.isPlaying) return false; // Don't crossfade if user has audio off
+    if (!state.isPlaying) {
+      console.log('⏭️ Crossfade skipped - audio is OFF');
+      return false;
+    }
+    
+    console.log('🎼 Crossfading audio...');
     
     try {
-      // Start new audio at 0 volume
       toAudio.volume = 0;
       toAudio.currentTime = 0;
       await toAudio.play();
       
-      // Crossfade
       gsap.to(fromAudio, { 
         volume: 0, 
         duration: duration,
@@ -151,10 +141,10 @@ window.AHAudioState = (() => {
         duration: duration 
       });
       
-      console.log('🎼 Crossfade complete');
+      console.log('✅ Crossfade complete');
       return true;
     } catch (e) {
-      console.warn('Crossfade failed:', e);
+      console.warn('❌ Crossfade failed:', e);
       return false;
     }
   };
@@ -170,3 +160,5 @@ window.AHAudioState = (() => {
     VOLUME_LEVEL
   };
 })();
+
+console.log('✅ Audio State Manager loaded (v3.0 - session-only)');
