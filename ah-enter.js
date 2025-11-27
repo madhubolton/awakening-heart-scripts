@@ -4,19 +4,20 @@
   
   FLOW:
   1) Title animates → Welcome (prompt0) breathes out → PAUSE
-  2) User scrolls/clicks → breathing navigation through prompts 0-3
+  2) User scrolls/clicks → breathing navigation through prompts 0-4
      - Each transition lights up corresponding stairway step
      - Click zones: top 50% = back, bottom 50% = forward
-  3) After final prompt, user enters oracle (navigates to random CMS scene)
+  3) After prompt4, user clicks/scrolls → oracle entry (temple dissolves, etc.)
+  4) Final click on Metatron center → divination to random CMS scene
   
   CHANGES in v11.0:
-  - Prompts 1-3 now user-controlled with breathing navigation
+  - Prompts 1-4 now user-controlled with breathing navigation
   - Click navigation with top/bottom zones
-  - Stairway lights respond to prompt navigation
+  - Stairway lights respond to prompt navigation (4 steps for 4 prompts)
   - NO audio autoplay - user enables manually
-  - Metatron stays at normal scale during entry
-  - Goddess glides in during general entry, drops to dock before divination
-  - Facet loop removed from entry sequence
+  - Metatron stays at normal scale during prompt navigation
+  - After prompt4, temple dissolves and oracle becomes active
+  - User clicks Metatron center to trigger divination/randomizer
 --------------------------------------------------------------*/
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -40,9 +41,10 @@ document.addEventListener("DOMContentLoaded", () => {
     
     prompts: [
       document.getElementById("prompt0"), // Welcome
-      document.getElementById("prompt1"),
-      document.getElementById("prompt2"),
-      document.getElementById("prompt3")  // Final prompt
+      document.getElementById("prompt1"), // What are you dealing with?
+      document.getElementById("prompt2"), // What are you present to?
+      document.getElementById("prompt3"), // What is your intention?
+      document.getElementById("prompt4")  // What is your question?
     ].filter(Boolean)
   };
 
@@ -389,9 +391,9 @@ document.addEventListener("DOMContentLoaded", () => {
     
     const nextIndex = State.currentPromptIndex + 1;
     
-    // If at last prompt, enter oracle
+    // If we've shown all prompts (0-4), enter oracle
     if (nextIndex >= DOM.prompts.length) {
-      console.log("🚪 Reached end - entering oracle");
+      console.log("🚪 All prompts complete - entering oracle");
       enterOracle();
       return;
     }
@@ -416,7 +418,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // ============================================================
-  // ORACLE ENTRY (after final prompt)
+  // ORACLE ENTRY (temple dissolves, Metatron center becomes active)
   // ============================================================
   
   function enterOracle() {
@@ -424,12 +426,16 @@ document.addEventListener("DOMContentLoaded", () => {
     State.enteredOracle = true;
     State.canNavigate = false;
     
-    console.log("🚪 Entering oracle...");
+    console.log("🚪 Entering oracle - temple dissolving, Metatron center activating");
     
     gsap.set(document.documentElement, { cursor: "default" });
     
     const entryTl = gsap.timeline({
-      defaults: { ease: "sine.inOut" }
+      defaults: { ease: "sine.inOut" },
+      onComplete: () => {
+        console.log("✅ Oracle active - click Metatron center to divine");
+        enableMetatronCenter();
+      }
     });
     
     // Hide current prompt
@@ -482,12 +488,56 @@ document.addEventListener("DOMContentLoaded", () => {
         console.log("🎛️ Audio UI visible (audio OFF - user must enable)");
       }
     });
+  }
+  
+  // ============================================================
+  // METATRON CENTER ACTIVATION (for divination trigger)
+  // ============================================================
+  
+  function enableMetatronCenter() {
+    const center = document.getElementById("P_C");
+    if (!center) {
+      console.warn("⚠️ Metatron center (P_C) not found");
+      return;
+    }
     
-    // Begin divination sequence
-    entryTl.add(() => {
-      console.log("🔮 Starting divination sequence");
-      divinationSequence();
-    }, ">");
+    console.log("🎯 Metatron center now active - click to begin divination");
+    
+    // Make center clickable
+    gsap.set(center, {
+      cursor: "pointer",
+      pointerEvents: "auto",
+      opacity: 0.8
+    });
+    
+    // Pulse to indicate interactivity
+    gsap.to(center, {
+      opacity: 1,
+      scale: 1.05,
+      duration: 1.5,
+      repeat: -1,
+      yoyo: true,
+      ease: "sine.inOut",
+      transformOrigin: "center center"
+    });
+    
+    // Attach click handler
+    center.addEventListener("click", handleCenterClick);
+  }
+  
+  function handleCenterClick(e) {
+    e.stopPropagation();
+    
+    console.log("🎯 Metatron center clicked - beginning divination");
+    
+    const center = document.getElementById("P_C");
+    if (center) {
+      gsap.killTweensOf(center);
+      center.removeEventListener("click", handleCenterClick);
+      gsap.set(center, { pointerEvents: "none" });
+    }
+    
+    divinationSequence();
   }
 
   // ============================================================
