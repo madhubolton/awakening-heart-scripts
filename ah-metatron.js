@@ -1,7 +1,12 @@
 /*--------------------------------------------------------------
-  Awakening Heart : Metatron Engine Core v2.0
+  Awakening Heart : Metatron Engine Core v3.0
   Handles facet + portal animations with Pattern Library support
-  Version: 2.0 | Date: 2025-11-15
+  Version: 3.0 | Date: 2025-01-12
+  
+  New in v3.0:
+  - Breath cycle support (checks for "breathing" config first)
+  - Unified coordination of facets + portals for regulation
+  - Backward compatible with legacy facets/portals configs
   
   New in v2.0:
   - Integration with AHPatterns animation library
@@ -23,13 +28,13 @@ const deepMerge = (a, b) => {
 
 // Legacy defaults for backward compatibility
 const DEFAULTS = {
-  timing: { facetsDelay: 0, portalsDelay: 4 },
+  timing: { facetsDelay: 0, portalsDelay: 4, goddessDelay: 5 },
+  breathing: null,  // NEW: breathing config takes precedence
   facets: { 
     groups: {}, 
     sequence: [], 
     styles: {}, 
     delayBetweenGroups: 0.4,
-    // New pattern-based fields
     pattern: null,
     ids: [],
     options: {}
@@ -39,7 +44,6 @@ const DEFAULTS = {
     sequence: [], 
     styles: {}, 
     delayBetweenGroups: 0.3,
-    // New pattern-based fields
     pattern: null,
     ids: [],
     options: {}
@@ -76,10 +80,53 @@ window.AHCONFIG = readSceneConfig();
 window.metatron = {
   
   /**
+   * Check if breathing mode is active
+   */
+  isBreathingMode() {
+    return !!window.AHCONFIG.breathing;
+  },
+
+  /**
+   * Start breath cycle animation
+   * NEW in v3.0 - unified facet + portal coordination
+   */
+  startBreathing(cfg = window.AHCONFIG.breathing) {
+    if (!cfg) {
+      console.log('⏭️ No breathing config - skipping');
+      return;
+    }
+    
+    if (!window.AHPatterns || !window.AHPatterns.breathCycle) {
+      console.warn('⚠️ AHPatterns.breathCycle not available');
+      return;
+    }
+    
+    console.log('🌬️ Starting breath cycle animation');
+    console.log('   Preset:', cfg.preset || 'custom');
+    console.log('   Colors:', cfg.colors || 'defaults');
+    
+    // Stop any existing animations
+    this.stopAll();
+    
+    // Start breath cycle
+    window.AHPatterns.breathCycle(null, {
+      preset: cfg.preset || 'deepCalm',
+      timing: cfg.timing || null,
+      colors: cfg.colors || { bright: "#77ffcc", dim: "#2a4a5e" }
+    });
+  },
+
+  /**
    * Start facet animations
    * Supports both legacy group-based and new pattern-based configs
    */
   startFacets(cfg = window.AHCONFIG.facets) {
+    // Skip if breathing mode is active
+    if (this.isBreathingMode()) {
+      console.log('⏭️ Breathing mode active - skipping independent facets');
+      return;
+    }
+    
     this.stopFacets();
     
     // Check if using new pattern-based config
@@ -133,6 +180,12 @@ window.metatron = {
    * Supports both legacy group-based and new pattern-based configs
    */
   startPortals(cfg = window.AHCONFIG.portals) {
+    // Skip if breathing mode is active
+    if (this.isBreathingMode()) {
+      console.log('⏭️ Breathing mode active - skipping independent portals');
+      return;
+    }
+    
     this.stopPortals();
     
     // Check if using new pattern-based config
@@ -178,7 +231,6 @@ window.metatron = {
 
   /**
    * Start Triple Goddess animations
-   * NEW in v2.0
    */
   startGoddess(cfg = window.AHCONFIG.goddess) {
     if (!cfg || !cfg.pattern) {
@@ -238,9 +290,19 @@ window.metatron = {
   },
 
   /**
+   * Stop breath cycle
+   */
+  stopBreathing() {
+    if (window.AHPatterns && window.AHPatterns.stopBreathCycle) {
+      window.AHPatterns.stopBreathCycle();
+    }
+  },
+
+  /**
    * Stop all animations
    */
   stopAll() {
+    this.stopBreathing();
     this.stopFacets();
     this.stopPortals();
     this.stopGoddess();
@@ -268,11 +330,39 @@ window.metatron = {
  */
 window.addEventListener('DOMContentLoaded', () => {
   const t = window.AHCONFIG.timing || {};
+  const breathing = window.AHCONFIG.breathing;
   
-  console.log('🎭 Metatron Engine v2.0 initialized', {
+  console.log('🎭 Metatron Engine v3.0 initialized', {
     config: window.AHCONFIG,
-    patternsAvailable: !!window.AHPatterns
+    patternsAvailable: !!window.AHPatterns,
+    breathingMode: !!breathing
   });
+  
+  // ============================================================
+  // BREATHING MODE: Unified breath cycle
+  // ============================================================
+  if (breathing) {
+    console.log('🌬️ Breathing mode detected - starting unified breath cycle');
+    
+    // Start breath cycle immediately (or with small delay for page load)
+    setTimeout(() => {
+      window.metatron.startBreathing();
+    }, 500);
+    
+    // Start goddess (synced to breath cycle duration if configured)
+    if (window.AHCONFIG.goddess && window.AHCONFIG.goddess.pattern) {
+      setTimeout(() => {
+        window.metatron.startGoddess();
+      }, (t.goddessDelay || 1) * 1000);
+    }
+    
+    return; // Skip independent facets/portals
+  }
+  
+  // ============================================================
+  // LEGACY MODE: Independent facets + portals
+  // ============================================================
+  console.log('🔄 Legacy mode - starting independent animations');
   
   // Start facets
   setTimeout(() => {
