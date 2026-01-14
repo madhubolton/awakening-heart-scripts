@@ -29,6 +29,7 @@
 function getResponsiveScales() {
   const width = window.innerWidth;
   const height = window.innerHeight;
+  const isLandscape = width > height;
   
   // Phone portrait (narrow screens)
   if (width <= 480) {
@@ -52,9 +53,20 @@ function getResponsiveScales() {
     };
   }
   
-  // Tablet
+  // Tablet landscape
+  if (isLandscape && width <= 1400) {
+    console.log('📱 Responsive: Tablet landscape mode');
+    return {
+      metatronScale: 1.8,
+      goddessDockScale: 0.5,
+      goddessCenterScale: 0.7,
+      goddessDockY: '25vh'
+    };
+  }
+  
+  // Tablet portrait
   if (width <= 1024) {
-    console.log('📱 Responsive: Tablet mode');
+    console.log('📱 Responsive: Tablet portrait mode');
     return {
       metatronScale: 1.3,
       goddessDockScale: 0.6,
