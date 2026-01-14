@@ -26,52 +26,52 @@
   // ============================================================
   
   // Responsive scale detection
-  function getResponsiveScales() {
-    const width = window.innerWidth;
-    const height = window.innerHeight;
-    
-    // Phone portrait (narrow screens)
-    if (width <= 480) {
-      console.log('📱 Responsive: Phone portrait mode');
-      return {
-        metatronScale: 1.6,
-        goddessDockScale: 1.8,
-        goddessCenterScale: 2.0,
-        goddessDockY: '25vh'
-      };
-    }
-    
-    // Phone landscape (short height)
-    if (height <= 500) {
-      console.log('📱 Responsive: Phone landscape mode');
-      return {
-        metatronScale: 1.8,
-        goddessDockScale: 1.2,
-        goddessCenterScale: 1.4,
-        goddessDockY: '22vh'
-      };
-    }
-    
-    // Tablet
-    if (width <= 1024) {
-      console.log('📱 Responsive: Tablet mode');
-      return {
-        metatronScale: 1.5,
-        goddessDockScale: 0.8,
-        goddessCenterScale: 1.0,
-        goddessDockY: '20vh'
-      };
-    }
-    
-    // Desktop (default)
-    console.log('🖥️ Responsive: Desktop mode');
+function getResponsiveScales() {
+  const width = window.innerWidth;
+  const height = window.innerHeight;
+  
+  // Phone portrait (narrow screens)
+  if (width <= 480) {
+    console.log('📱 Responsive: Phone portrait mode');
     return {
-      metatronScale: 1.25,
-      goddessDockScale: 0.5,
+      metatronScale: 1.6,
+      goddessDockScale: 1.0,
+      goddessCenterScale: 1.2,
+      goddessDockY: '22vh'
+    };
+  }
+  
+  // Phone landscape (short height)
+  if (height <= 500) {
+    console.log('📱 Responsive: Phone landscape mode');
+    return {
+      metatronScale: 1.4,
+      goddessDockScale: 0.8,
       goddessCenterScale: 1.0,
       goddessDockY: '20vh'
     };
   }
+  
+  // Tablet
+  if (width <= 1024) {
+    console.log('📱 Responsive: Tablet mode');
+    return {
+      metatronScale: 1.3,
+      goddessDockScale: 0.6,
+      goddessCenterScale: 0.8,
+      goddessDockY: '18vh'
+    };
+  }
+  
+  // Desktop (default)
+  console.log('🖥️ Responsive: Desktop mode');
+  return {
+    metatronScale: 1.25,
+    goddessDockScale: 0.5,
+    goddessCenterScale: 1.0,
+    goddessDockY: '20vh'
+  };
+}
   
   const responsiveScales = getResponsiveScales();
   
