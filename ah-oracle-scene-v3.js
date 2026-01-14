@@ -45,10 +45,10 @@ function getResponsiveScales() {
   if (height <= 500) {
     console.log('📱 Responsive: Phone landscape mode');
     return {
-      metatronScale: 1.4,
-      goddessDockScale: 0.8,
-      goddessCenterScale: 1.0,
-      goddessDockY: '20vh'
+      metatronScale: 1.75,
+      goddessDockScale: 0.7,
+      goddessCenterScale: 0.5,
+      goddessDockY: '10vh'
     };
   }
   
