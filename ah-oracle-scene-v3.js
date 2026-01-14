@@ -36,7 +36,7 @@ function getResponsiveScales() {
     return {
       metatronScale: 1.4,
       goddessDockScale: 1.5,
-      goddessCenterScale: 1.3,
+      goddessCenterScale: 2.3,
       goddessDockY: '20vh'
     };
   }
