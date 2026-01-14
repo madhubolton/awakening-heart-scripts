@@ -14,12 +14,59 @@
   Meditation Mode → Divination → (cycle repeats)
 --------------------------------------------------------------*/
 
-(function() {
-  'use strict';
-
+// ============================================================
+  // CONFIGURATION (with responsive scaling)
   // ============================================================
-  // CONFIGURATION
-  // ============================================================
+  
+  // Responsive scale detection
+  function getResponsiveScales() {
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    
+    // Phone portrait (narrow screens)
+    if (width <= 480) {
+      console.log('📱 Responsive: Phone portrait mode');
+      return {
+        metatronScale: 2.5,
+        goddessDockScale: 1.8,
+        goddessCenterScale: 2.0,
+        goddessDockY: '25vh'
+      };
+    }
+    
+    // Phone landscape (short height)
+    if (height <= 500) {
+      console.log('📱 Responsive: Phone landscape mode');
+      return {
+        metatronScale: 1.8,
+        goddessDockScale: 1.2,
+        goddessCenterScale: 1.4,
+        goddessDockY: '22vh'
+      };
+    }
+    
+    // Tablet
+    if (width <= 1024) {
+      console.log('📱 Responsive: Tablet mode');
+      return {
+        metatronScale: 1.5,
+        goddessDockScale: 0.8,
+        goddessCenterScale: 1.0,
+        goddessDockY: '20vh'
+      };
+    }
+    
+    // Desktop (default)
+    console.log('🖥️ Responsive: Desktop mode');
+    return {
+      metatronScale: 1.25,
+      goddessDockScale: 0.5,
+      goddessCenterScale: 1.0,
+      goddessDockY: '20vh'
+    };
+  }
+  
+  const responsiveScales = getResponsiveScales();
   
   const CONFIG = {
     breathIn: 0.8,
@@ -29,13 +76,13 @@
     audioVolume: 0.35,
     audioFadeDuration: 1.0,
     breathDuckAmount: 0.15,
-    goddessDockY: '20vh',
-    goddessDockScale: 0.5,
+    goddessDockY: responsiveScales.goddessDockY,
+    goddessDockScale: responsiveScales.goddessDockScale,
     goddessCenterY: 0,
-    goddessCenterScale: 1.0,
+    goddessCenterScale: responsiveScales.goddessCenterScale,
     metatronContentOpacity: 0.3,
     metatronMeditationOpacity: 1.0,
-    metatronScale: 1.25,
+    metatronScale: responsiveScales.metatronScale,
     sceneEntryDuration: 2.0,
     metatronBreatheDuration: 1.2,
     meditationTransitionDuration: 1.4,
@@ -47,7 +94,6 @@
       inMeditation: 'ah_in_meditation'
     }
   };
-
   // ============================================================
   // STATE MANAGEMENT
   // ============================================================
