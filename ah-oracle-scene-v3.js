@@ -1,6 +1,10 @@
 /*--------------------------------------------------------------
   Awakening Heart : Oracle Scene Controller
-  Version: 4.0.0 | Date: 2025-11-27
+  Version: 4.1.0 | Date: 2025-01-15
+  
+  CHANGES in v4.1:
+  - Fixed IIFE wrapper
+  - Responsive scaling for mobile devices
   
   CHANGES in v4.0:
   - Click navigation with top/bottom zones (top=back, bottom=forward)
@@ -14,7 +18,10 @@
   Meditation Mode → Divination → (cycle repeats)
 --------------------------------------------------------------*/
 
-// ============================================================
+(function() {
+  'use strict';
+
+  // ============================================================
   // CONFIGURATION (with responsive scaling)
   // ============================================================
   
@@ -94,6 +101,7 @@
       inMeditation: 'ah_in_meditation'
     }
   };
+
   // ============================================================
   // STATE MANAGEMENT
   // ============================================================
@@ -1227,7 +1235,7 @@
   
   async function init() {
     try {
-      console.log('💖 Oracle Scene Controller v4.0 initializing...');
+      console.log('💖 Oracle Scene Controller v4.1 initializing...');
       
       cacheDOM();
       setupInitialState();
