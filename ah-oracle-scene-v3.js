@@ -34,7 +34,7 @@ function getResponsiveScales() {
   if (width <= 480) {
     console.log('📱 Responsive: Phone portrait mode');
     return {
-      metatronScale: 0.90,
+      metatronScale: 0.95,
       goddessDockScale: 1.5,
       goddessCenterScale: 2.0,
       goddessDockY: '12vh'
