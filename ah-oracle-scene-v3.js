@@ -34,10 +34,10 @@ function getResponsiveScales() {
   if (width <= 480) {
     console.log('📱 Responsive: Phone portrait mode');
     return {
-      metatronScale: 1.3,
+      metatronScale: 1.2,
       goddessDockScale: 2.5,
       goddessCenterScale: 1.0,
-      goddessDockY: '2vh'
+      goddessDockY: '1vh'
     };
   }
   
