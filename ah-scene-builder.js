@@ -1,8 +1,12 @@
 /*--------------------------------------------------------------
   Awakening Heart : Scene Builder
-  Version: 1.2.3 | Date: 2025-01-16
+  Version: 1.2.4 | Date: 2025-01-16
   
   Unified animation system for Metatron facets and portals.
+  
+  CHANGES in v1.2.4:
+  - Added graceful fade-in for outer portals (no abrupt flash)
+  - Added graceful fade-in for center portal breathing
   
   CHANGES in v1.2.3:
   - Center portal now on SAME timeline as outer portals for perfect sync
@@ -158,12 +162,12 @@
       return null;
     }
 
-    // Set initial state for outer portals
+    // Set initial state for outer portals - start invisible for graceful fade-in
     outerFills.forEach(shape => {
       gsap.set(shape, {
         fill: outerFill,
         scale: OUTER_BREATH.scaleMax,
-        opacity: OUTER_BREATH.opacityMax,
+        opacity: 0,  // Start invisible
         transformOrigin: "center center"
       });
     });
@@ -171,9 +175,16 @@
     outerStrokes.forEach(shape => {
       gsap.set(shape, {
         scale: OUTER_BREATH.scaleMax,
-        opacity: OUTER_BREATH.opacityMax,
+        opacity: 0,  // Start invisible
         transformOrigin: "center center"
       });
+    });
+    
+    // Graceful fade-in for outer portals
+    gsap.to(outerShapes, {
+      opacity: OUTER_BREATH.opacityMax,
+      duration: 1.5,
+      ease: "sine.inOut"
     });
 
     // Center portal setup (if configured for breathing)
@@ -203,25 +214,32 @@
       if (centerFillEl) {
         centerShapes = [centerFillEl, centerStrokeEl].filter(Boolean);
         
-        // Set initial state for center (depends on mode)
+        // Set initial state for center - start invisible for graceful fade-in
         const isReversed = centerMode === "reversed";
-        const initialScale = isReversed ? CENTER_BREATH.scaleMin : CENTER_BREATH.scaleMax;
-        const initialOpacity = isReversed ? CENTER_BREATH.opacityMin : CENTER_BREATH.opacityMax;
+        const targetScale = isReversed ? CENTER_BREATH.scaleMin : CENTER_BREATH.scaleMax;
+        const targetOpacity = isReversed ? CENTER_BREATH.opacityMin : CENTER_BREATH.opacityMax;
         
         gsap.set(centerFillEl, {
           fill: centerFill,
-          scale: initialScale,
-          opacity: initialOpacity,
+          scale: targetScale,
+          opacity: 0,  // Start invisible
           transformOrigin: "center center"
         });
         
         if (centerStrokeEl) {
           gsap.set(centerStrokeEl, {
-            scale: initialScale,
-            opacity: initialOpacity * 0.8,
+            scale: targetScale,
+            opacity: 0,  // Start invisible
             transformOrigin: "center center"
           });
         }
+        
+        // Graceful fade-in for center portal
+        gsap.to(centerShapes, {
+          opacity: targetOpacity,
+          duration: 1.5,
+          ease: "sine.inOut"
+        });
         
         console.log(`🎯 Center portal: ${centerMode} mode`);
         console.log(`   Fill: ${centerFill} | Opacity: ${CENTER_BREATH.opacityMin} → ${CENTER_BREATH.opacityMax}`);
