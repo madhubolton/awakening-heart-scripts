@@ -1,6 +1,11 @@
 /*--------------------------------------------------------------
   Awakening Heart : Oracle Scene Controller
-  Version: 4.2.0 | Date: 2025-01-16
+  Version: 4.2.1 | Date: 2025-01-16
+  
+  CHANGES in v4.2.1:
+  - Fixed center divination not overriding breathing animation
+  - Center portal breathing now continues in meditation mode
+  - enableCenterDivination only enables click, doesn't animate
   
   CHANGES in v4.2:
   - Replaced window.metatron with new sceneBuilder system
@@ -917,33 +922,31 @@
       return;
     }
     
-    console.log('🎯 Center divination enabled');
+    console.log('🎯 Center divination enabled (click only, breathing continues)');
     
+    // Only enable pointer events for clicking - don't override the breathing animation
     gsap.set(DOM.metatronCenter, {
       cursor: 'pointer',
-      pointerEvents: 'auto',
-      opacity: 0.8
+      pointerEvents: 'auto'
     });
     
-    gsap.to(DOM.metatronCenter, {
-      opacity: 1,
-      scale: 1.05,
-      duration: 1.5,
-      repeat: -1,
-      yoyo: true,
-      ease: 'sine.inOut',
-      transformOrigin: 'center center'
-    });
+    // Note: We no longer animate opacity/scale here because the breathing 
+    // animation from sceneBuilder handles that. The center portal breathing
+    // (synced or reversed) provides the visual feedback in meditation mode.
   }
   
   function disableCenterDivination() {
     if (!DOM.metatronCenter) return;
     
-    gsap.killTweensOf(DOM.metatronCenter);
+    // Only disable pointer events - don't kill the breathing animation
     gsap.set(DOM.metatronCenter, {
       pointerEvents: 'none',
-      opacity: 0
+      cursor: 'default'
     });
+    
+    // Note: We no longer kill tweens or set opacity to 0 here because
+    // the breathing animation should continue. The breathing will be
+    // stopped by stopSceneAnimations() when divination is triggered.
   }
   
   function triggerDivination() {
