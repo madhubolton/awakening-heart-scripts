@@ -1,9 +1,13 @@
 /*--------------------------------------------------------------
   Awakening Heart : Scene Builder
-  Version: 1.1.0 | Date: 2025-01-16
+  Version: 1.2.0 | Date: 2025-01-16
   
   Unified animation system for Metatron facets and portals.
   Replaces ah-animation-patterns.js and ah-metatron.js
+  
+  CHANGES in v1.2.0:
+  - Center portal breathing modes: static, synced, reversed
+  - Reversed mode creates opposing breath (center expands on inhale)
   
   CHANGES in v1.1.0:
   - Configurable outer portals (breathing with fill color)
@@ -15,6 +19,7 @@
   - Multiple facet groups with independent timing
   - Breathing outer portals synchronized to therapeutic HRV patterns
   - Animated inner portals (wave, pulse, sequential patterns)
+  - Center portal with synced/reversed breathing options
   - Clean API with stop/pause/resume/restart controls
   - Compositional layering (same facets in multiple groups)
   
@@ -36,27 +41,11 @@
       },
       centerPortal: {
         fill: "#ffffff",
-        opacity: 0.5
+        opacity: 0.8,
+        mode: "reversed"  // "static", "synced", or "reversed"
       },
-      facetGroups: [
-        {
-          name: "Group 1",
-          ids: ["F_O_OCT_TL", "F_O_OCT_TR", ...],
-          fill: "#33ffcc",
-          duration: 2.5,
-          stagger: 0.15,
-          delay: 0,
-          repeat: -1,
-          yoyo: true,
-          ease: "sine.inOut"
-        }
-      ]
+      facetGroups: [...]
     });
-    
-    // Control the scene
-    window.activeScene.stop();
-    window.activeScene.pause();
-    window.activeScene.resume();
 --------------------------------------------------------------*/
 
 (function() {
@@ -148,6 +137,12 @@
     if (window._breathTimeline) {
       window._breathTimeline.kill();
       window._breathTimeline = null;
+    }
+    
+    // Clear center breath timeline
+    if (window._centerBreathTimeline) {
+      window._centerBreathTimeline.kill();
+      window._centerBreathTimeline = null;
     }
     
     // Clear active scene reference
@@ -271,6 +266,179 @@
   }
 
   // ============================================================
+  // CENTER PORTAL: BREATHING ANIMATION (Synced or Reversed)
+  // ============================================================
+  
+  function createCenterBreathingAnimation(preset, centerConfig = {}, reversed = false) {
+    const timing = BREATH_PRESETS[preset] || BREATH_PRESETS.deepCalm;
+    
+    const centerFill = centerConfig.fill || "#ffffff";
+    const centerOpacityMax = centerConfig.opacity ?? 0.8;
+    const centerOpacityMin = centerConfig.opacityMin ?? 0.2;
+    
+    const BREATH = {
+      scaleMin: centerConfig.scaleMin ?? 0.85,
+      scaleMax: centerConfig.scaleMax ?? 1.1,  // Center can expand beyond 1.0
+      opacityMin: centerOpacityMin,
+      opacityMax: centerOpacityMax,
+      holdScale: BREATH_DEFAULTS.holdScale,
+      holdOpacity: BREATH_DEFAULTS.holdOpacity
+    };
+
+    const centerFillShape = getShape(CENTER_PORTAL_FILL_ID);
+    const centerStrokeShape = getShape(CENTER_PORTAL_STROKE_ID);
+    
+    if (!centerFillShape) {
+      console.warn("⚠️ Center portal element not found");
+      return null;
+    }
+    
+    const centerShapes = [centerFillShape, centerStrokeShape].filter(Boolean);
+    
+    const modeLabel = reversed ? "reversed" : "synced";
+    console.log(`🎯 Center Portal Breathing: ${modeLabel}`);
+    console.log(`   Fill: ${centerFill} | Opacity: ${BREATH.opacityMin} → ${BREATH.opacityMax}`);
+    console.log(`   Scale: ${BREATH.scaleMin} → ${BREATH.scaleMax}`);
+
+    // Set initial state
+    // Reversed: starts contracted (will expand on inhale)
+    // Synced: starts expanded (will contract on inhale)
+    const initialScale = reversed ? BREATH.scaleMin : BREATH.scaleMax;
+    const initialOpacity = reversed ? BREATH.opacityMin : BREATH.opacityMax;
+    
+    gsap.set(centerFillShape, {
+      fill: centerFill,
+      scale: initialScale,
+      opacity: initialOpacity,
+      transformOrigin: "center center"
+    });
+    
+    if (centerStrokeShape) {
+      gsap.set(centerStrokeShape, {
+        scale: initialScale,
+        opacity: initialOpacity * 0.8,
+        transformOrigin: "center center"
+      });
+    }
+
+    // Create breath timeline
+    const tl = gsap.timeline({ repeat: -1 });
+    let pos = 0;
+
+    if (reversed) {
+      // REVERSED MODE: Center expands on inhale, contracts on exhale
+      // (Opposite of outer portals - energy gathers to center on inhale)
+      
+      // INHALE: Expand + Brighten (energy gathering)
+      tl.to(centerShapes, {
+        scale: BREATH.scaleMax,
+        opacity: BREATH.opacityMax,
+        duration: timing.inhale,
+        ease: "sine.inOut"
+      }, pos);
+      pos += timing.inhale;
+
+      // HOLD-IN: Subtle micro-motion at peak
+      if (timing.holdIn > 0) {
+        tl.to(centerShapes, {
+          scale: BREATH.scaleMax - BREATH.holdScale,
+          opacity: BREATH.opacityMax - BREATH.holdOpacity,
+          duration: timing.holdIn / 2,
+          ease: "sine.inOut"
+        }, pos);
+        tl.to(centerShapes, {
+          scale: BREATH.scaleMax,
+          opacity: BREATH.opacityMax,
+          duration: timing.holdIn / 2,
+          ease: "sine.inOut"
+        }, pos + timing.holdIn / 2);
+        pos += timing.holdIn;
+      }
+
+      // EXHALE: Contract + Dim (energy radiating outward)
+      tl.to(centerShapes, {
+        scale: BREATH.scaleMin,
+        opacity: BREATH.opacityMin,
+        duration: timing.exhale,
+        ease: "sine.inOut"
+      }, pos);
+      pos += timing.exhale;
+
+      // HOLD-OUT: Subtle micro-motion at rest
+      if (timing.holdOut > 0) {
+        tl.to(centerShapes, {
+          scale: BREATH.scaleMin + BREATH.holdScale,
+          opacity: BREATH.opacityMin + BREATH.holdOpacity,
+          duration: timing.holdOut / 2,
+          ease: "sine.inOut"
+        }, pos);
+        tl.to(centerShapes, {
+          scale: BREATH.scaleMin,
+          opacity: BREATH.opacityMin,
+          duration: timing.holdOut / 2,
+          ease: "sine.inOut"
+        }, pos + timing.holdOut / 2);
+      }
+      
+    } else {
+      // SYNCED MODE: Center follows outer portals exactly
+      
+      // INHALE: Contract + Dim
+      tl.to(centerShapes, {
+        scale: BREATH.scaleMin,
+        opacity: BREATH.opacityMin,
+        duration: timing.inhale,
+        ease: "sine.inOut"
+      }, pos);
+      pos += timing.inhale;
+
+      // HOLD-IN
+      if (timing.holdIn > 0) {
+        tl.to(centerShapes, {
+          scale: BREATH.scaleMin + BREATH.holdScale,
+          opacity: BREATH.opacityMin + BREATH.holdOpacity,
+          duration: timing.holdIn / 2,
+          ease: "sine.inOut"
+        }, pos);
+        tl.to(centerShapes, {
+          scale: BREATH.scaleMin,
+          opacity: BREATH.opacityMin,
+          duration: timing.holdIn / 2,
+          ease: "sine.inOut"
+        }, pos + timing.holdIn / 2);
+        pos += timing.holdIn;
+      }
+
+      // EXHALE: Expand + Brighten
+      tl.to(centerShapes, {
+        scale: BREATH.scaleMax,
+        opacity: BREATH.opacityMax,
+        duration: timing.exhale,
+        ease: "sine.inOut"
+      }, pos);
+      pos += timing.exhale;
+
+      // HOLD-OUT
+      if (timing.holdOut > 0) {
+        tl.to(centerShapes, {
+          scale: BREATH.scaleMax - BREATH.holdScale,
+          opacity: BREATH.opacityMax - BREATH.holdOpacity,
+          duration: timing.holdOut / 2,
+          ease: "sine.inOut"
+        }, pos);
+        tl.to(centerShapes, {
+          scale: BREATH.scaleMax,
+          opacity: BREATH.opacityMax,
+          duration: timing.holdOut / 2,
+          ease: "sine.inOut"
+        }, pos + timing.holdOut / 2);
+      }
+    }
+
+    return tl;
+  }
+
+  // ============================================================
   // INNER PORTALS: ANIMATED LIKE FACETS
   // ============================================================
   
@@ -323,7 +491,7 @@
   // CENTER PORTAL: STATIC CONFIGURATION
   // ============================================================
   
-  function configureCenterPortal(config = {}) {
+  function configureCenterPortalStatic(config = {}) {
     const fill = config.fill || "transparent";
     const opacity = config.opacity ?? 0;
     
@@ -335,7 +503,7 @@
         fill: fill,
         opacity: opacity
       });
-      console.log(`🎯 Center Portal: fill ${fill}, opacity ${opacity}`);
+      console.log(`🎯 Center Portal (static): fill ${fill}, opacity ${opacity}`);
     }
     
     // Stroke stays as-is (white outline)
@@ -419,11 +587,24 @@
     console.log(`   Breath delay: ${breathDelay}s`);
 
     // --------------------------------------------------------
-    // CONFIGURE CENTER PORTAL (static)
+    // CONFIGURE CENTER PORTAL
     // --------------------------------------------------------
     
+    let centerBreathTimeline = null;
+    
     if (centerPortalConfig) {
-      configureCenterPortal(centerPortalConfig);
+      const centerMode = centerPortalConfig.mode || "static";
+      
+      if (centerMode === "synced") {
+        // Will be started with breathing
+        console.log(`🎯 Center Portal mode: synced (will breathe with outer portals)`);
+      } else if (centerMode === "reversed") {
+        // Will be started with breathing
+        console.log(`🎯 Center Portal mode: reversed (will breathe opposite to outer portals)`);
+      } else {
+        // Static - configure now
+        configureCenterPortalStatic(centerPortalConfig);
+      }
     }
 
     // --------------------------------------------------------
@@ -447,17 +628,32 @@
     }
 
     // --------------------------------------------------------
-    // BREATHING OUTER PORTALS
+    // BREATHING OUTER PORTALS + CENTER PORTAL
     // --------------------------------------------------------
     
     let breathTimeline = null;
     
     if (autoStartBreathing) {
       const startBreathing = () => {
+        // Start outer portals breathing
         breathTimeline = createBreathingAnimation(breathPreset, outerPortalsConfig);
         if (breathTimeline) {
           window._breathTimeline = breathTimeline;
           window._sceneTimelines.push(breathTimeline);
+        }
+        
+        // Start center portal breathing if mode is synced or reversed
+        if (centerPortalConfig) {
+          const centerMode = centerPortalConfig.mode || "static";
+          
+          if (centerMode === "synced" || centerMode === "reversed") {
+            const isReversed = centerMode === "reversed";
+            centerBreathTimeline = createCenterBreathingAnimation(breathPreset, centerPortalConfig, isReversed);
+            if (centerBreathTimeline) {
+              window._centerBreathTimeline = centerBreathTimeline;
+              window._sceneTimelines.push(centerBreathTimeline);
+            }
+          }
         }
       };
       
@@ -488,6 +684,9 @@
         if (window._breathTimeline) {
           window._breathTimeline.pause();
         }
+        if (window._centerBreathTimeline) {
+          window._centerBreathTimeline.pause();
+        }
         allTweens.forEach(tween => {
           if (tween && tween.pause) tween.pause();
         });
@@ -498,6 +697,9 @@
       resume: () => {
         if (window._breathTimeline) {
           window._breathTimeline.resume();
+        }
+        if (window._centerBreathTimeline) {
+          window._centerBreathTimeline.resume();
         }
         allTweens.forEach(tween => {
           if (tween && tween.resume) tween.resume();
@@ -523,6 +725,19 @@
           window._sceneTimelines.push(breathTimeline);
           console.log(`🌬️ Breathing started manually`);
         }
+        
+        // Also start center if configured
+        if (centerPortalConfig) {
+          const centerMode = centerPortalConfig.mode || "static";
+          if (centerMode === "synced" || centerMode === "reversed") {
+            const isReversed = centerMode === "reversed";
+            centerBreathTimeline = createCenterBreathingAnimation(breathPreset, centerPortalConfig, isReversed);
+            if (centerBreathTimeline) {
+              window._centerBreathTimeline = centerBreathTimeline;
+              window._sceneTimelines.push(centerBreathTimeline);
+            }
+          }
+        }
       },
       
       // Stop only breathing
@@ -530,8 +745,12 @@
         if (window._breathTimeline) {
           window._breathTimeline.kill();
           window._breathTimeline = null;
-          console.log(`🌬️ Breathing stopped`);
         }
+        if (window._centerBreathTimeline) {
+          window._centerBreathTimeline.kill();
+          window._centerBreathTimeline = null;
+        }
+        console.log(`🌬️ Breathing stopped`);
       },
       
       // Stop only facets
@@ -547,11 +766,28 @@
         if (window._breathTimeline) {
           window._breathTimeline.kill();
         }
+        if (window._centerBreathTimeline) {
+          window._centerBreathTimeline.kill();
+        }
+        
         breathTimeline = createBreathingAnimation(newPreset, outerPortalsConfig);
         if (breathTimeline) {
           window._breathTimeline = breathTimeline;
-          console.log(`🌬️ Breath preset changed to: ${newPreset}`);
         }
+        
+        // Update center if configured
+        if (centerPortalConfig) {
+          const centerMode = centerPortalConfig.mode || "static";
+          if (centerMode === "synced" || centerMode === "reversed") {
+            const isReversed = centerMode === "reversed";
+            centerBreathTimeline = createCenterBreathingAnimation(newPreset, centerPortalConfig, isReversed);
+            if (centerBreathTimeline) {
+              window._centerBreathTimeline = centerBreathTimeline;
+            }
+          }
+        }
+        
+        console.log(`🌬️ Breath preset changed to: ${newPreset}`);
       },
       
       // Get current state
@@ -560,6 +796,7 @@
         breathPreset: breathPreset,
         facetGroupCount: facetGroups.length,
         isBreathing: !!window._breathTimeline,
+        isCenterBreathing: !!window._centerBreathTimeline,
         isPaused: window._breathTimeline ? window._breathTimeline.paused() : false
       })
     };
@@ -606,8 +843,9 @@
     sceneBuilder,
     stopAllAnimations,
     createBreathingAnimation,
+    createCenterBreathingAnimation,
     animateInnerPortals,
-    configureCenterPortal,
+    configureCenterPortalStatic,
     getShape,
     getShapes,
     readSceneConfig,
@@ -624,12 +862,12 @@
   // INITIALIZATION
   // ============================================================
   
-  console.log("🎬 Scene Builder v1.1.0 loaded");
+  console.log("🎬 Scene Builder v1.2.0 loaded");
   console.log("═══════════════════════════════════════════════════════");
   console.log("Usage:");
   console.log("  sceneBuilder({ name, breathPreset, outerPortals, innerPortals, centerPortal, facetGroups })");
+  console.log("  centerPortal modes: 'static', 'synced', 'reversed'");
   console.log("  window.activeScene.stop() / .pause() / .resume()");
-  console.log("  stopAllAnimations()");
   console.log("═══════════════════════════════════════════════════════");
 
 })();
