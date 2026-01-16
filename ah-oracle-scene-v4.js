@@ -197,7 +197,7 @@
       audioToggle: document.getElementById('audioToggle'),
       audioIcon: document.querySelector('#audioToggle svg, #audioToggle .icon-On'),
       
-      sceneConfig: document.getElementById('scene-config')  // NEW: Scene config element
+      sceneConfig: document.getElementById('scene-config') || document.getElementById('scene-config-data')  // Supports both script tag and div
     };
     
     const allBlocks = [
