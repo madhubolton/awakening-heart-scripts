@@ -1,21 +1,43 @@
 /*--------------------------------------------------------------
   Awakening Heart : Scene Builder
-  Version: 1.0.0 | Date: 2025-01-16
+  Version: 1.1.0 | Date: 2025-01-16
   
-  Unified animation system for Metatron facets and breathing portals.
+  Unified animation system for Metatron facets and portals.
   Replaces ah-animation-patterns.js and ah-metatron.js
+  
+  CHANGES in v1.1.0:
+  - Configurable outer portals (breathing with fill color)
+  - Configurable inner portals (animated like facets)
+  - Configurable center portal (static, separate from divination)
+  - Fixed portal fill color application
   
   Features:
   - Multiple facet groups with independent timing
-  - Breathing portals synchronized to therapeutic HRV patterns
+  - Breathing outer portals synchronized to therapeutic HRV patterns
+  - Animated inner portals (wave, pulse, sequential patterns)
   - Clean API with stop/pause/resume/restart controls
   - Compositional layering (same facets in multiple groups)
   
   Usage:
-    // Start a scene
     window.sceneBuilder({
       name: "My Scene",
       breathPreset: "deepCalm",
+      outerPortals: {
+        fill: "#ed95df",
+        opacity: 0.6
+      },
+      innerPortals: {
+        fill: "#77ffcc",
+        duration: 2.0,
+        stagger: 0.15,
+        delay: 0,
+        repeat: -1,
+        yoyo: true
+      },
+      centerPortal: {
+        fill: "#ffffff",
+        opacity: 0.5
+      },
       facetGroups: [
         {
           name: "Group 1",
@@ -35,10 +57,6 @@
     window.activeScene.stop();
     window.activeScene.pause();
     window.activeScene.resume();
-    window.activeScene.restart();
-    
-    // Stop everything
-    window.stopAllAnimations();
 --------------------------------------------------------------*/
 
 (function() {
@@ -64,18 +82,27 @@
   const BREATH_DEFAULTS = {
     scaleMin: 0.88,
     scaleMax: 1.0,
-    opacityMin: 0.4,
-    opacityMax: 0.95,
+    opacityMin: 0.3,
+    opacityMax: 0.9,
     holdScale: 0.008,
     holdOpacity: 0.03
   };
 
   // ============================================================
-  // PORTAL IDS (Outer ring breathing elements)
+  // PORTAL IDS
   // ============================================================
   
-  const OUTER_PORTAL_IDS = ["P_OT", "P_ORT", "P_ORB", "P_OB", "P_OLB", "P_OLT"];
-  const OUTER_STROKE_IDS = ["P_OT_S", "P_ORT_S", "P_ORB_S", "P_OB_S", "P_OLB_S", "P_OLT_S"];
+  // Outer portals (breathing)
+  const OUTER_PORTAL_FILL_IDS = ["P_OT", "P_ORT", "P_ORB", "P_OB", "P_OLB", "P_OLT"];
+  const OUTER_PORTAL_STROKE_IDS = ["P_OT_S", "P_ORT_S", "P_ORB_S", "P_OB_S", "P_OLB_S", "P_OLT_S"];
+  
+  // Inner portals (animated like facets)
+  const INNER_PORTAL_FILL_IDS = ["P_IT", "P_IRT", "P_IRB", "P_IB", "P_ILB", "P_ILT"];
+  const INNER_PORTAL_STROKE_IDS = ["P_IT_S", "P_IRT_S", "P_IRB_S", "P_IB_S", "P_ILB_S", "P_ILT_S"];
+  
+  // Center portal (separate - used for divination)
+  const CENTER_PORTAL_FILL_ID = "P_C";
+  const CENTER_PORTAL_STROKE_ID = "P_C_S";
 
   // ============================================================
   // HELPER: Get animatable shape from element ID
@@ -130,38 +157,59 @@
   }
 
   // ============================================================
-  // BREATHING PORTALS ANIMATION
+  // OUTER PORTALS: BREATHING ANIMATION
   // ============================================================
   
-  function createBreathingAnimation(preset, options = {}) {
+  function createBreathingAnimation(preset, portalConfig = {}) {
     const timing = BREATH_PRESETS[preset] || BREATH_PRESETS.deepCalm;
     const cycle = timing.inhale + timing.holdIn + timing.exhale + timing.holdOut;
     
+    // Get portal fill color from config
+    const portalFill = portalConfig.fill || "#ed95df";
+    const portalOpacityMax = portalConfig.opacity ?? BREATH_DEFAULTS.opacityMax;
+    const portalOpacityMin = portalConfig.opacityMin ?? BREATH_DEFAULTS.opacityMin;
+    
     const BREATH = {
-      scaleMin: options.scaleMin ?? BREATH_DEFAULTS.scaleMin,
-      scaleMax: options.scaleMax ?? BREATH_DEFAULTS.scaleMax,
-      opacityMin: options.opacityMin ?? BREATH_DEFAULTS.opacityMin,
-      opacityMax: options.opacityMax ?? BREATH_DEFAULTS.opacityMax,
+      scaleMin: portalConfig.scaleMin ?? BREATH_DEFAULTS.scaleMin,
+      scaleMax: portalConfig.scaleMax ?? BREATH_DEFAULTS.scaleMax,
+      opacityMin: portalOpacityMin,
+      opacityMax: portalOpacityMax,
       holdScale: BREATH_DEFAULTS.holdScale,
       holdOpacity: BREATH_DEFAULTS.holdOpacity
     };
 
-    // Get portal elements
-    const portalShapes = getShapes([...OUTER_PORTAL_IDS, ...OUTER_STROKE_IDS]);
+    // Get outer portal elements (fills and strokes)
+    const outerFills = getShapes(OUTER_PORTAL_FILL_IDS);
+    const outerStrokes = getShapes(OUTER_PORTAL_STROKE_IDS);
+    const portalShapes = [...outerFills, ...outerStrokes];
     
     if (portalShapes.length === 0) {
-      console.warn("⚠️ No breathing portal elements found");
+      console.warn("⚠️ No outer portal elements found");
       return null;
     }
 
-    console.log(`🌬️ Breathing: ${preset} (${timing.inhale}s in → ${timing.holdIn}s hold → ${timing.exhale}s out → ${timing.holdOut}s hold)`);
+    console.log(`🌬️ Outer Portals Breathing: ${preset}`);
+    console.log(`   Pattern: ${timing.inhale}s in → ${timing.holdIn}s hold → ${timing.exhale}s out → ${timing.holdOut}s hold`);
     console.log(`   Cycle: ${cycle}s | Portals: ${portalShapes.length}`);
+    console.log(`   Fill: ${portalFill} | Opacity: ${BREATH.opacityMin} → ${BREATH.opacityMax}`);
 
-    // Set initial state (expanded + bright, ready to inhale)
-    gsap.set(portalShapes, {
-      scale: BREATH.scaleMax,
-      opacity: BREATH.opacityMax,
-      transformOrigin: "center center"
+    // Set initial state with fill color (expanded + bright, ready to inhale)
+    outerFills.forEach(shape => {
+      gsap.set(shape, {
+        fill: portalFill,
+        scale: BREATH.scaleMax,
+        opacity: BREATH.opacityMax,
+        transformOrigin: "center center"
+      });
+    });
+    
+    // Strokes just scale and fade, no fill change
+    outerStrokes.forEach(shape => {
+      gsap.set(shape, {
+        scale: BREATH.scaleMax,
+        opacity: BREATH.opacityMax,
+        transformOrigin: "center center"
+      });
     });
 
     // Create breath timeline
@@ -220,6 +268,82 @@
     }
 
     return tl;
+  }
+
+  // ============================================================
+  // INNER PORTALS: ANIMATED LIKE FACETS
+  // ============================================================
+  
+  function animateInnerPortals(config = {}) {
+    // Extract config with defaults
+    const fill = config.fill || "#77ffcc";
+    const duration = config.duration ?? 2.0;
+    const stagger = config.stagger ?? 0.15;
+    const delay = config.delay ?? 0;
+    const repeat = config.repeat ?? -1;
+    const yoyo = config.yoyo ?? true;
+    const ease = config.ease || "sine.inOut";
+    
+    // Get inner portal elements
+    const innerFills = getShapes(INNER_PORTAL_FILL_IDS);
+    const innerStrokes = getShapes(INNER_PORTAL_STROKE_IDS);
+    
+    console.log(`✨ Inner Portals: ${innerFills.length} fills, ${innerStrokes.length} strokes`);
+    console.log(`   Fill: ${fill}, duration: ${duration}s, stagger: ${stagger}s, delay: ${delay}s`);
+    
+    if (innerFills.length === 0) {
+      console.warn("⚠️ No inner portal elements found");
+      return [];
+    }
+    
+    // Set initial state (transparent)
+    innerFills.forEach(shape => {
+      shape.style.fill = "transparent";
+      shape.style.opacity = "1";
+    });
+    
+    // Create tweens for fills
+    const tweens = [];
+    innerFills.forEach((shape, i) => {
+      const tween = gsap.to(shape, {
+        fill: fill,
+        duration: duration,
+        repeat: repeat,
+        yoyo: yoyo,
+        ease: ease,
+        delay: delay + (i * stagger)
+      });
+      tweens.push(tween);
+    });
+    
+    return tweens;
+  }
+
+  // ============================================================
+  // CENTER PORTAL: STATIC CONFIGURATION
+  // ============================================================
+  
+  function configureCenterPortal(config = {}) {
+    const fill = config.fill || "transparent";
+    const opacity = config.opacity ?? 0;
+    
+    const centerFill = getShape(CENTER_PORTAL_FILL_ID);
+    const centerStroke = getShape(CENTER_PORTAL_STROKE_ID);
+    
+    if (centerFill) {
+      gsap.set(centerFill, {
+        fill: fill,
+        opacity: opacity
+      });
+      console.log(`🎯 Center Portal: fill ${fill}, opacity ${opacity}`);
+    }
+    
+    // Stroke stays as-is (white outline)
+    if (centerStroke) {
+      gsap.set(centerStroke, {
+        opacity: opacity > 0 ? 0.8 : 0
+      });
+    }
   }
 
   // ============================================================
@@ -282,7 +406,9 @@
     // Extract config
     const sceneName = config.name || "Custom Scene";
     const breathPreset = config.breathPreset || "deepCalm";
-    const breathOptions = config.breathOptions || {};
+    const outerPortalsConfig = config.outerPortals || {};
+    const innerPortalsConfig = config.innerPortals || null;
+    const centerPortalConfig = config.centerPortal || null;
     const facetGroups = config.facetGroups || [];
     const breathDelay = config.breathDelay ?? 0;
     const autoStartBreathing = config.autoStartBreathing ?? true;
@@ -291,6 +417,14 @@
     console.log(`   Breath preset: ${breathPreset}`);
     console.log(`   Facet groups: ${facetGroups.length}`);
     console.log(`   Breath delay: ${breathDelay}s`);
+
+    // --------------------------------------------------------
+    // CONFIGURE CENTER PORTAL (static)
+    // --------------------------------------------------------
+    
+    if (centerPortalConfig) {
+      configureCenterPortal(centerPortalConfig);
+    }
 
     // --------------------------------------------------------
     // ANIMATE FACET GROUPS
@@ -304,26 +438,33 @@
     });
 
     // --------------------------------------------------------
-    // BREATHING PORTALS
+    // ANIMATE INNER PORTALS (like facets)
+    // --------------------------------------------------------
+    
+    if (innerPortalsConfig) {
+      const innerTweens = animateInnerPortals(innerPortalsConfig);
+      allTweens.push(...innerTweens);
+    }
+
+    // --------------------------------------------------------
+    // BREATHING OUTER PORTALS
     // --------------------------------------------------------
     
     let breathTimeline = null;
     
     if (autoStartBreathing) {
-      if (breathDelay > 0) {
-        setTimeout(() => {
-          breathTimeline = createBreathingAnimation(breathPreset, breathOptions);
-          if (breathTimeline) {
-            window._breathTimeline = breathTimeline;
-            window._sceneTimelines.push(breathTimeline);
-          }
-        }, breathDelay * 1000);
-      } else {
-        breathTimeline = createBreathingAnimation(breathPreset, breathOptions);
+      const startBreathing = () => {
+        breathTimeline = createBreathingAnimation(breathPreset, outerPortalsConfig);
         if (breathTimeline) {
           window._breathTimeline = breathTimeline;
           window._sceneTimelines.push(breathTimeline);
         }
+      };
+      
+      if (breathDelay > 0) {
+        setTimeout(startBreathing, breathDelay * 1000);
+      } else {
+        startBreathing();
       }
     }
 
@@ -376,7 +517,7 @@
           console.log("⚠️ Breathing already running");
           return;
         }
-        breathTimeline = createBreathingAnimation(breathPreset, breathOptions);
+        breathTimeline = createBreathingAnimation(breathPreset, outerPortalsConfig);
         if (breathTimeline) {
           window._breathTimeline = breathTimeline;
           window._sceneTimelines.push(breathTimeline);
@@ -406,7 +547,7 @@
         if (window._breathTimeline) {
           window._breathTimeline.kill();
         }
-        breathTimeline = createBreathingAnimation(newPreset, breathOptions);
+        breathTimeline = createBreathingAnimation(newPreset, outerPortalsConfig);
         if (breathTimeline) {
           window._breathTimeline = breathTimeline;
           console.log(`🌬️ Breath preset changed to: ${newPreset}`);
@@ -434,7 +575,9 @@
   // ============================================================
   
   function readSceneConfig() {
-    const el = document.getElementById('scene-config');
+    // Try both possible element IDs
+    const el = document.getElementById('scene-config') || document.getElementById('scene-config-data');
+    
     if (!el) {
       console.log("ℹ️ No scene-config element found");
       return null;
@@ -451,25 +594,6 @@
   }
 
   // ============================================================
-  // AUTO-START (if config exists in DOM)
-  // ============================================================
-  
-  function autoStart() {
-    const config = readSceneConfig();
-    
-    if (config) {
-      // Check if breathing should be delayed (for scene entry animation)
-      // The scene controller will handle this by setting autoStartBreathing: false
-      // and calling startBreathing() after entry animation completes
-      
-      console.log("🚀 Auto-starting scene from config");
-      sceneBuilder(config);
-    } else {
-      console.log("ℹ️ No auto-start config - waiting for manual sceneBuilder() call");
-    }
-  }
-
-  // ============================================================
   // EXPORTS
   // ============================================================
   
@@ -482,27 +606,30 @@
     sceneBuilder,
     stopAllAnimations,
     createBreathingAnimation,
+    animateInnerPortals,
+    configureCenterPortal,
     getShape,
     getShapes,
     readSceneConfig,
     BREATH_PRESETS,
     BREATH_DEFAULTS,
-    OUTER_PORTAL_IDS
+    OUTER_PORTAL_FILL_IDS,
+    OUTER_PORTAL_STROKE_IDS,
+    INNER_PORTAL_FILL_IDS,
+    INNER_PORTAL_STROKE_IDS,
+    CENTER_PORTAL_FILL_ID
   };
 
   // ============================================================
   // INITIALIZATION
   // ============================================================
   
-  console.log("🎬 Scene Builder v1.0.0 loaded");
+  console.log("🎬 Scene Builder v1.1.0 loaded");
   console.log("═══════════════════════════════════════════════════════");
   console.log("Usage:");
-  console.log("  sceneBuilder({ name, breathPreset, facetGroups: [...] })");
+  console.log("  sceneBuilder({ name, breathPreset, outerPortals, innerPortals, centerPortal, facetGroups })");
   console.log("  window.activeScene.stop() / .pause() / .resume()");
   console.log("  stopAllAnimations()");
   console.log("═══════════════════════════════════════════════════════");
-
-  // Don't auto-start on DOMContentLoaded - let the scene controller handle timing
-  // The scene controller will call sceneBuilder() after entry animation completes
 
 })();
