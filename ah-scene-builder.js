@@ -1,8 +1,11 @@
 /*--------------------------------------------------------------
   Awakening Heart : Scene Builder
-  Version: 1.2.1 | Date: 2025-01-16
+  Version: 1.2.2 | Date: 2025-01-16
   
   Unified animation system for Metatron facets and portals.
+  
+  CHANGES in v1.2.2:
+  - Fixed center portal scaleMax to 1.0 (was 1.1, broke geometry)
   
   CHANGES in v1.2.1:
   - Fixed inner portals incorrectly getting breathing animation
@@ -275,8 +278,8 @@
     const centerOpacityMin = centerConfig.opacityMin ?? 0.2;
     
     const BREATH = {
-      scaleMin: centerConfig.scaleMin ?? 0.85,
-      scaleMax: centerConfig.scaleMax ?? 1.1,
+      scaleMin: centerConfig.scaleMin ?? 0.88,
+      scaleMax: centerConfig.scaleMax ?? 1.0,  // Never exceed 1.0 or geometry breaks
       opacityMin: centerOpacityMin,
       opacityMax: centerOpacityMax,
       holdScale: BREATH_DEFAULTS.holdScale,
