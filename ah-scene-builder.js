@@ -1,8 +1,12 @@
 /*--------------------------------------------------------------
   Awakening Heart : Scene Builder
-  Version: 1.2.4 | Date: 2025-01-16
+  Version: 1.2.5 | Date: 2025-01-16
   
   Unified animation system for Metatron facets and portals.
+  
+  CHANGES in v1.2.5:
+  - Fixed breathing loop causing portals to flash/disappear
+  - Restructured to master timeline with intro fade-in + nested repeating breath
   
   CHANGES in v1.2.4:
   - Added graceful fade-in for outer portals (no abrupt flash)
@@ -162,12 +166,12 @@
       return null;
     }
 
-    // Set initial state for outer portals - start invisible for graceful fade-in
+    // Set initial state for outer portals - start invisible
     outerFills.forEach(shape => {
       gsap.set(shape, {
         fill: outerFill,
         scale: OUTER_BREATH.scaleMax,
-        opacity: 0,  // Start invisible
+        opacity: 0,
         transformOrigin: "center center"
       });
     });
@@ -175,16 +179,9 @@
     outerStrokes.forEach(shape => {
       gsap.set(shape, {
         scale: OUTER_BREATH.scaleMax,
-        opacity: 0,  // Start invisible
+        opacity: 0,
         transformOrigin: "center center"
       });
-    });
-    
-    // Graceful fade-in for outer portals
-    gsap.to(outerShapes, {
-      opacity: OUTER_BREATH.opacityMax,
-      duration: 1.5,
-      ease: "sine.inOut"
     });
 
     // Center portal setup (if configured for breathing)
@@ -263,35 +260,60 @@
       console.log(`🎯 Center portal: static mode`);
     }
 
-    // Create unified breath timeline
-    const tl = gsap.timeline({ repeat: -1 });
-    let pos = 0;
-
+    // Create breathing animation with intro fade-in + repeating breath cycle
+    // Use a master timeline with a nested repeating timeline for the breath cycle
+    
+    const masterTl = gsap.timeline();
+    
     // ============================================================
-    // INHALE PHASE
+    // INTRO: Graceful fade-in (plays once)
     // ============================================================
     
-    // Outer: Contract + Dim
-    tl.to(outerShapes, {
+    // Fade in outer portals
+    masterTl.to(outerShapes, {
+      opacity: OUTER_BREATH.opacityMax,
+      duration: 1.5,
+      ease: "sine.inOut"
+    }, 0);
+    
+    // Fade in center portal (if breathing)
+    if (centerShapes.length > 0 && CENTER_BREATH) {
+      const centerTargetOpacity = centerMode === "reversed" 
+        ? CENTER_BREATH.opacityMin 
+        : CENTER_BREATH.opacityMax;
+      
+      masterTl.to(centerShapes, {
+        opacity: centerTargetOpacity,
+        duration: 1.5,
+        ease: "sine.inOut"
+      }, 0);
+    }
+    
+    // ============================================================
+    // BREATH CYCLE (repeats infinitely after intro)
+    // ============================================================
+    
+    const breathTl = gsap.timeline({ repeat: -1 });
+    let pos = 0;
+
+    // INHALE: Contract + Dim
+    breathTl.to(outerShapes, {
       scale: OUTER_BREATH.scaleMin,
       opacity: OUTER_BREATH.opacityMin,
       duration: timing.inhale,
       ease: "sine.inOut"
     }, pos);
     
-    // Center (if breathing)
     if (centerShapes.length > 0 && CENTER_BREATH) {
       if (centerMode === "reversed") {
-        // Reversed: Expand + Brighten on inhale
-        tl.to(centerShapes, {
+        breathTl.to(centerShapes, {
           scale: CENTER_BREATH.scaleMax,
           opacity: CENTER_BREATH.opacityMax,
           duration: timing.inhale,
           ease: "sine.inOut"
         }, pos);
       } else {
-        // Synced: Contract + Dim on inhale (same as outer)
-        tl.to(centerShapes, {
+        breathTl.to(centerShapes, {
           scale: CENTER_BREATH.scaleMin,
           opacity: CENTER_BREATH.opacityMin,
           duration: timing.inhale,
@@ -302,50 +324,43 @@
     
     pos += timing.inhale;
 
-    // ============================================================
-    // HOLD-IN PHASE
-    // ============================================================
-    
+    // HOLD-IN
     if (timing.holdIn > 0) {
-      // Outer: subtle micro-motion
-      tl.to(outerShapes, {
+      breathTl.to(outerShapes, {
         scale: OUTER_BREATH.scaleMin + OUTER_BREATH.holdScale,
         opacity: OUTER_BREATH.opacityMin + OUTER_BREATH.holdOpacity,
         duration: timing.holdIn / 2,
         ease: "sine.inOut"
       }, pos);
-      tl.to(outerShapes, {
+      breathTl.to(outerShapes, {
         scale: OUTER_BREATH.scaleMin,
         opacity: OUTER_BREATH.opacityMin,
         duration: timing.holdIn / 2,
         ease: "sine.inOut"
       }, pos + timing.holdIn / 2);
       
-      // Center (if breathing)
       if (centerShapes.length > 0 && CENTER_BREATH) {
         if (centerMode === "reversed") {
-          // Reversed: at max, subtle dip
-          tl.to(centerShapes, {
+          breathTl.to(centerShapes, {
             scale: CENTER_BREATH.scaleMax - CENTER_BREATH.holdScale,
             opacity: CENTER_BREATH.opacityMax - CENTER_BREATH.holdOpacity,
             duration: timing.holdIn / 2,
             ease: "sine.inOut"
           }, pos);
-          tl.to(centerShapes, {
+          breathTl.to(centerShapes, {
             scale: CENTER_BREATH.scaleMax,
             opacity: CENTER_BREATH.opacityMax,
             duration: timing.holdIn / 2,
             ease: "sine.inOut"
           }, pos + timing.holdIn / 2);
         } else {
-          // Synced: at min, subtle bump
-          tl.to(centerShapes, {
+          breathTl.to(centerShapes, {
             scale: CENTER_BREATH.scaleMin + CENTER_BREATH.holdScale,
             opacity: CENTER_BREATH.opacityMin + CENTER_BREATH.holdOpacity,
             duration: timing.holdIn / 2,
             ease: "sine.inOut"
           }, pos);
-          tl.to(centerShapes, {
+          breathTl.to(centerShapes, {
             scale: CENTER_BREATH.scaleMin,
             opacity: CENTER_BREATH.opacityMin,
             duration: timing.holdIn / 2,
@@ -357,31 +372,24 @@
       pos += timing.holdIn;
     }
 
-    // ============================================================
-    // EXHALE PHASE
-    // ============================================================
-    
-    // Outer: Expand + Brighten
-    tl.to(outerShapes, {
+    // EXHALE: Expand + Brighten
+    breathTl.to(outerShapes, {
       scale: OUTER_BREATH.scaleMax,
       opacity: OUTER_BREATH.opacityMax,
       duration: timing.exhale,
       ease: "sine.inOut"
     }, pos);
     
-    // Center (if breathing)
     if (centerShapes.length > 0 && CENTER_BREATH) {
       if (centerMode === "reversed") {
-        // Reversed: Contract + Dim on exhale
-        tl.to(centerShapes, {
+        breathTl.to(centerShapes, {
           scale: CENTER_BREATH.scaleMin,
           opacity: CENTER_BREATH.opacityMin,
           duration: timing.exhale,
           ease: "sine.inOut"
         }, pos);
       } else {
-        // Synced: Expand + Brighten on exhale (same as outer)
-        tl.to(centerShapes, {
+        breathTl.to(centerShapes, {
           scale: CENTER_BREATH.scaleMax,
           opacity: CENTER_BREATH.opacityMax,
           duration: timing.exhale,
@@ -392,50 +400,43 @@
     
     pos += timing.exhale;
 
-    // ============================================================
-    // HOLD-OUT PHASE
-    // ============================================================
-    
+    // HOLD-OUT
     if (timing.holdOut > 0) {
-      // Outer: subtle micro-motion
-      tl.to(outerShapes, {
+      breathTl.to(outerShapes, {
         scale: OUTER_BREATH.scaleMax - OUTER_BREATH.holdScale,
         opacity: OUTER_BREATH.opacityMax - OUTER_BREATH.holdOpacity,
         duration: timing.holdOut / 2,
         ease: "sine.inOut"
       }, pos);
-      tl.to(outerShapes, {
+      breathTl.to(outerShapes, {
         scale: OUTER_BREATH.scaleMax,
         opacity: OUTER_BREATH.opacityMax,
         duration: timing.holdOut / 2,
         ease: "sine.inOut"
       }, pos + timing.holdOut / 2);
       
-      // Center (if breathing)
       if (centerShapes.length > 0 && CENTER_BREATH) {
         if (centerMode === "reversed") {
-          // Reversed: at min, subtle bump
-          tl.to(centerShapes, {
+          breathTl.to(centerShapes, {
             scale: CENTER_BREATH.scaleMin + CENTER_BREATH.holdScale,
             opacity: CENTER_BREATH.opacityMin + CENTER_BREATH.holdOpacity,
             duration: timing.holdOut / 2,
             ease: "sine.inOut"
           }, pos);
-          tl.to(centerShapes, {
+          breathTl.to(centerShapes, {
             scale: CENTER_BREATH.scaleMin,
             opacity: CENTER_BREATH.opacityMin,
             duration: timing.holdOut / 2,
             ease: "sine.inOut"
           }, pos + timing.holdOut / 2);
         } else {
-          // Synced: at max, subtle dip
-          tl.to(centerShapes, {
+          breathTl.to(centerShapes, {
             scale: CENTER_BREATH.scaleMax - CENTER_BREATH.holdScale,
             opacity: CENTER_BREATH.opacityMax - CENTER_BREATH.holdOpacity,
             duration: timing.holdOut / 2,
             ease: "sine.inOut"
           }, pos);
-          tl.to(centerShapes, {
+          breathTl.to(centerShapes, {
             scale: CENTER_BREATH.scaleMax,
             opacity: CENTER_BREATH.opacityMax,
             duration: timing.holdOut / 2,
@@ -445,8 +446,11 @@
       }
     }
 
-    console.log(`✅ Breathing timeline created (outer + center on same timeline)`);
-    return tl;
+    // Add the repeating breath cycle to master timeline after intro
+    masterTl.add(breathTl, 1.5);  // Start breath cycle after fade-in completes
+
+    console.log(`✅ Breathing timeline created (intro fade-in + repeating cycle)`);
+    return masterTl;
   }
 
   // ============================================================
