@@ -1,6 +1,10 @@
 /*--------------------------------------------------------------
   Awakening Heart : Oracle Scene Controller
-  Version: 4.3.2 | Date: 2025-01-17
+  Version: 4.3.3 | Date: 2025-01-17
+  
+  CHANGES in v4.3.3:
+  - Fixed: Meditation audio now starts when enabling audio in meditation mode
+  - Audio toggle properly starts both meditation audio AND breath audio
   
   CHANGES in v4.3.2:
   - Fixed: Breath audio now starts when enabling audio while in meditation mode
@@ -1189,29 +1193,59 @@
   async function handleAudioToggle(e) {
     e.stopPropagation();
     
-    const activeAudio = (State.inMeditation && State.meditationAudio && !State.meditationAudio.paused) 
+    // Determine which audio SHOULD be playing based on current mode
+    const targetAudio = State.inMeditation && State.meditationAudio 
       ? State.meditationAudio 
       : State.backgroundAudio;
     
-    if (!activeAudio) return;
+    if (!targetAudio) return;
     
     console.log('🎵 Audio toggle clicked');
     
     if (window.AHAudioState) {
-      await window.AHAudioState.toggle(activeAudio, DOM.audioIcon);
+      // Check current state before toggle
+      const wasPlaying = window.AHAudioState.getState().isPlaying;
+      
+      await window.AHAudioState.toggle(targetAudio, DOM.audioIcon);
       
       const audioState = window.AHAudioState.getState();
       
-      // Start/stop breath audio based on new state
-      if (State.inMeditation && window.AHBreathAudio?.getState()?.isInitialized) {
-        if (audioState.isPlaying) {
-          // Audio turned ON while in meditation - start breath audio
-          window.AHBreathAudio.start();
-          console.log('🌬️ Breath audio started (audio enabled in meditation)');
-        } else {
-          // Audio turned OFF - stop breath audio
-          window.AHBreathAudio.stop();
-          console.log('🌬️ Breath audio stopped (audio disabled)');
+      // Handle meditation mode audio
+      if (State.inMeditation) {
+        if (audioState.isPlaying && !wasPlaying) {
+          // Audio just turned ON while in meditation
+          
+          // Start meditation audio if not playing
+          if (State.meditationAudio && State.meditationAudio.paused) {
+            State.meditationAudio.currentTime = 0;
+            State.meditationAudio.volume = 0;
+            await State.meditationAudio.play();
+            gsap.to(State.meditationAudio, { volume: window.AHAudioState.VOLUME_LEVEL, duration: 0.5 });
+            console.log('🎵 Meditation audio started');
+          }
+          
+          // Start breath audio
+          if (window.AHBreathAudio?.getState()?.isInitialized) {
+            window.AHBreathAudio.start();
+            console.log('🌬️ Breath audio started (audio enabled in meditation)');
+          }
+        } else if (!audioState.isPlaying && wasPlaying) {
+          // Audio just turned OFF
+          
+          // Stop meditation audio
+          if (State.meditationAudio && !State.meditationAudio.paused) {
+            gsap.to(State.meditationAudio, { 
+              volume: 0, 
+              duration: 0.3, 
+              onComplete: () => State.meditationAudio.pause() 
+            });
+          }
+          
+          // Stop breath audio
+          if (window.AHBreathAudio?.getState()?.isPlaying) {
+            window.AHBreathAudio.stop();
+            console.log('🌬️ Breath audio stopped (audio disabled)');
+          }
         }
       }
       
@@ -1225,7 +1259,7 @@
         }
       }
     } else {
-      const isPlaying = !activeAudio.paused;
+      const isPlaying = !targetAudio.paused;
       
       if (isPlaying) {
         if (State.backgroundAudio) {
@@ -1251,10 +1285,10 @@
         }
       } else {
         try {
-          if (activeAudio.paused) {
-            await activeAudio.play();
+          if (targetAudio.paused) {
+            await targetAudio.play();
           }
-          gsap.to(activeAudio, {
+          gsap.to(targetAudio, {
             volume: CONFIG.audioVolume,
             duration: 0.3
           });
