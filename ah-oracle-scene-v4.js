@@ -1,6 +1,10 @@
 /*--------------------------------------------------------------
   Awakening Heart : Oracle Scene Controller
-  Version: 4.3.1 | Date: 2025-01-17
+  Version: 4.3.2 | Date: 2025-01-17
+  
+  CHANGES in v4.3.2:
+  - Fixed: Breath audio now starts when enabling audio while in meditation mode
+  - Audio toggle checks meditation state and starts/stops breath audio accordingly
   
   CHANGES in v4.3.1:
   - Disabled old playBreathSound() during content navigation
@@ -1196,8 +1200,23 @@
     if (window.AHAudioState) {
       await window.AHAudioState.toggle(activeAudio, DOM.audioIcon);
       
-      if (State.breathAudio) {
-        const audioState = window.AHAudioState.getState();
+      const audioState = window.AHAudioState.getState();
+      
+      // Start/stop breath audio based on new state
+      if (State.inMeditation && window.AHBreathAudio?.getState()?.isInitialized) {
+        if (audioState.isPlaying) {
+          // Audio turned ON while in meditation - start breath audio
+          window.AHBreathAudio.start();
+          console.log('🌬️ Breath audio started (audio enabled in meditation)');
+        } else {
+          // Audio turned OFF - stop breath audio
+          window.AHBreathAudio.stop();
+          console.log('🌬️ Breath audio stopped (audio disabled)');
+        }
+      }
+      
+      // Legacy breath sound handling (for non-reactive mode)
+      if (State.breathAudio && !window.AHBreathAudio) {
         if (!audioState.isPlaying) {
           State.breathAudio.pause();
           State.breathAudio.volume = 0;
