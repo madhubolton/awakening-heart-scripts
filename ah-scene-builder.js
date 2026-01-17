@@ -1,8 +1,11 @@
 /*--------------------------------------------------------------
   Awakening Heart : Scene Builder
-  Version: 1.3.2 | Date: 2025-01-17
+  Version: 1.3.3 | Date: 2025-01-17
   
   Unified animation system for Metatron facets and portals.
+  
+  CHANGES in v1.3.3:
+  - Added opacity config support for innerPortals
   
   CHANGES in v1.3.2:
   - Added try-catch error handling for center portal setup
@@ -749,6 +752,7 @@
   
   function animateInnerPortals(config = {}) {
     const fill = config.fill || "#77ffcc";
+    const opacity = config.opacity ?? 1.0;
     const duration = config.duration ?? 2.0;
     const stagger = config.stagger ?? 0.15;
     const delay = config.delay ?? 0;
@@ -759,7 +763,7 @@
     const innerFills = getShapes(INNER_PORTAL_FILL_IDS);
     
     console.log(`✨ Inner Portals: ${innerFills.length} fills (fill animation only)`);
-    console.log(`   Fill: ${fill}, duration: ${duration}s, stagger: ${stagger}s, delay: ${delay}s`);
+    console.log(`   Fill: ${fill}, opacity: ${opacity}, duration: ${duration}s, stagger: ${stagger}s, delay: ${delay}s`);
     
     if (innerFills.length === 0) {
       console.warn("⚠️ No inner portal elements found");
@@ -767,7 +771,7 @@
     }
     
     innerFills.forEach(shape => {
-      gsap.set(shape, { fill: "transparent", opacity: 1 });
+      gsap.set(shape, { fill: "transparent", opacity: opacity });
     });
     
     const tweens = [];
@@ -1012,7 +1016,7 @@
     CENTER_PORTAL_FILL_ID
   };
 
-  console.log("🎬 Scene Builder v1.3.2 loaded");
+  console.log("🎬 Scene Builder v1.3.3 loaded");
   console.log("   Supports: breathPreset (single) or breathSequence (progressive)");
   console.log("   Audio: Auto-integrates with AHBreathAudio if initialized");
   console.log("═══════════════════════════════════════════════════════");
