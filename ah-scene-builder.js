@@ -1,8 +1,14 @@
 /*--------------------------------------------------------------
   Awakening Heart : Scene Builder
-  Version: 1.2.6 | Date: 2025-01-16
+  Version: 1.3.0 | Date: 2025-01-17
   
   Unified animation system for Metatron facets and portals.
+  
+  CHANGES in v1.3.0:
+  - Added progressive breath sequencing (breathSequence config)
+  - Sequences allow staged descent: simple → coherent → resonance
+  - Each stage has configurable cycle count (-1 for infinite)
+  - Default preset changed to 'coherent' (5-5, easiest to drop into)
   
   CHANGES in v1.2.6:
   - Added 'coherent' breath preset (5s in, 5s out) - easiest to drop into
@@ -133,7 +139,334 @@
   }
 
   // ============================================================
-  // BREATHING ANIMATION (Outer + Center on same timeline)
+  // BREATHING: CREATE SINGLE BREATH CYCLE (helper)
+  // ============================================================
+  
+  function createBreathCycle(preset, outerShapes, OUTER_BREATH, centerShapes, CENTER_BREATH, centerMode, repeatCount = -1) {
+    const timing = BREATH_PRESETS[preset] || BREATH_PRESETS.coherent;
+    const cycle = timing.inhale + timing.holdIn + timing.exhale + timing.holdOut;
+    
+    const breathTl = gsap.timeline({ repeat: repeatCount });
+    let pos = 0;
+
+    // INHALE: Contract + Dim
+    breathTl.to(outerShapes, {
+      scale: OUTER_BREATH.scaleMin,
+      opacity: OUTER_BREATH.opacityMin,
+      duration: timing.inhale,
+      ease: "sine.inOut"
+    }, pos);
+    
+    if (centerShapes.length > 0 && CENTER_BREATH) {
+      if (centerMode === "reversed") {
+        breathTl.to(centerShapes, {
+          scale: CENTER_BREATH.scaleMax,
+          opacity: CENTER_BREATH.opacityMax,
+          duration: timing.inhale,
+          ease: "sine.inOut"
+        }, pos);
+      } else {
+        breathTl.to(centerShapes, {
+          scale: CENTER_BREATH.scaleMin,
+          opacity: CENTER_BREATH.opacityMin,
+          duration: timing.inhale,
+          ease: "sine.inOut"
+        }, pos);
+      }
+    }
+    
+    pos += timing.inhale;
+
+    // HOLD-IN
+    if (timing.holdIn > 0) {
+      breathTl.to(outerShapes, {
+        scale: OUTER_BREATH.scaleMin + OUTER_BREATH.holdScale,
+        opacity: OUTER_BREATH.opacityMin + OUTER_BREATH.holdOpacity,
+        duration: timing.holdIn / 2,
+        ease: "sine.inOut"
+      }, pos);
+      breathTl.to(outerShapes, {
+        scale: OUTER_BREATH.scaleMin,
+        opacity: OUTER_BREATH.opacityMin,
+        duration: timing.holdIn / 2,
+        ease: "sine.inOut"
+      }, pos + timing.holdIn / 2);
+      
+      if (centerShapes.length > 0 && CENTER_BREATH) {
+        if (centerMode === "reversed") {
+          breathTl.to(centerShapes, {
+            scale: CENTER_BREATH.scaleMax - CENTER_BREATH.holdScale,
+            opacity: CENTER_BREATH.opacityMax - CENTER_BREATH.holdOpacity,
+            duration: timing.holdIn / 2,
+            ease: "sine.inOut"
+          }, pos);
+          breathTl.to(centerShapes, {
+            scale: CENTER_BREATH.scaleMax,
+            opacity: CENTER_BREATH.opacityMax,
+            duration: timing.holdIn / 2,
+            ease: "sine.inOut"
+          }, pos + timing.holdIn / 2);
+        } else {
+          breathTl.to(centerShapes, {
+            scale: CENTER_BREATH.scaleMin + CENTER_BREATH.holdScale,
+            opacity: CENTER_BREATH.opacityMin + CENTER_BREATH.holdOpacity,
+            duration: timing.holdIn / 2,
+            ease: "sine.inOut"
+          }, pos);
+          breathTl.to(centerShapes, {
+            scale: CENTER_BREATH.scaleMin,
+            opacity: CENTER_BREATH.opacityMin,
+            duration: timing.holdIn / 2,
+            ease: "sine.inOut"
+          }, pos + timing.holdIn / 2);
+        }
+      }
+      
+      pos += timing.holdIn;
+    }
+
+    // EXHALE: Expand + Brighten
+    breathTl.to(outerShapes, {
+      scale: OUTER_BREATH.scaleMax,
+      opacity: OUTER_BREATH.opacityMax,
+      duration: timing.exhale,
+      ease: "sine.inOut"
+    }, pos);
+    
+    if (centerShapes.length > 0 && CENTER_BREATH) {
+      if (centerMode === "reversed") {
+        breathTl.to(centerShapes, {
+          scale: CENTER_BREATH.scaleMin,
+          opacity: CENTER_BREATH.opacityMin,
+          duration: timing.exhale,
+          ease: "sine.inOut"
+        }, pos);
+      } else {
+        breathTl.to(centerShapes, {
+          scale: CENTER_BREATH.scaleMax,
+          opacity: CENTER_BREATH.opacityMax,
+          duration: timing.exhale,
+          ease: "sine.inOut"
+        }, pos);
+      }
+    }
+    
+    pos += timing.exhale;
+
+    // HOLD-OUT
+    if (timing.holdOut > 0) {
+      breathTl.to(outerShapes, {
+        scale: OUTER_BREATH.scaleMax - OUTER_BREATH.holdScale,
+        opacity: OUTER_BREATH.opacityMax - OUTER_BREATH.holdOpacity,
+        duration: timing.holdOut / 2,
+        ease: "sine.inOut"
+      }, pos);
+      breathTl.to(outerShapes, {
+        scale: OUTER_BREATH.scaleMax,
+        opacity: OUTER_BREATH.opacityMax,
+        duration: timing.holdOut / 2,
+        ease: "sine.inOut"
+      }, pos + timing.holdOut / 2);
+      
+      if (centerShapes.length > 0 && CENTER_BREATH) {
+        if (centerMode === "reversed") {
+          breathTl.to(centerShapes, {
+            scale: CENTER_BREATH.scaleMin + CENTER_BREATH.holdScale,
+            opacity: CENTER_BREATH.opacityMin + CENTER_BREATH.holdOpacity,
+            duration: timing.holdOut / 2,
+            ease: "sine.inOut"
+          }, pos);
+          breathTl.to(centerShapes, {
+            scale: CENTER_BREATH.scaleMin,
+            opacity: CENTER_BREATH.opacityMin,
+            duration: timing.holdOut / 2,
+            ease: "sine.inOut"
+          }, pos + timing.holdOut / 2);
+        } else {
+          breathTl.to(centerShapes, {
+            scale: CENTER_BREATH.scaleMax - CENTER_BREATH.holdScale,
+            opacity: CENTER_BREATH.opacityMax - CENTER_BREATH.holdOpacity,
+            duration: timing.holdOut / 2,
+            ease: "sine.inOut"
+          }, pos);
+          breathTl.to(centerShapes, {
+            scale: CENTER_BREATH.scaleMax,
+            opacity: CENTER_BREATH.opacityMax,
+            duration: timing.holdOut / 2,
+            ease: "sine.inOut"
+          }, pos + timing.holdOut / 2);
+        }
+      }
+    }
+
+    return { timeline: breathTl, cycleDuration: cycle };
+  }
+
+  // ============================================================
+  // BREATHING: PROGRESSIVE SEQUENCE
+  // ============================================================
+  
+  function createBreathSequence(sequence, outerConfig = {}, centerConfig = null) {
+    // Get outer portal elements
+    const outerFills = getShapes(OUTER_PORTAL_FILL_IDS);
+    const outerStrokes = getShapes(OUTER_PORTAL_STROKE_IDS);
+    const outerShapes = [...outerFills, ...outerStrokes];
+    
+    if (outerFills.length === 0) {
+      console.warn("⚠️ No outer portal fill elements found");
+      return null;
+    }
+
+    // Outer breath settings
+    const outerFill = outerConfig.fill || "#ed95df";
+    const outerOpacityMax = outerConfig.opacity ?? BREATH_DEFAULTS.opacityMax;
+    const outerOpacityMin = outerConfig.opacityMin ?? BREATH_DEFAULTS.opacityMin;
+    
+    const OUTER_BREATH = {
+      scaleMin: outerConfig.scaleMin ?? BREATH_DEFAULTS.scaleMin,
+      scaleMax: outerConfig.scaleMax ?? BREATH_DEFAULTS.scaleMax,
+      opacityMin: outerOpacityMin,
+      opacityMax: outerOpacityMax,
+      holdScale: BREATH_DEFAULTS.holdScale,
+      holdOpacity: BREATH_DEFAULTS.holdOpacity
+    };
+
+    // Set initial state for outer portals
+    outerFills.forEach(shape => {
+      gsap.set(shape, {
+        fill: outerFill,
+        scale: OUTER_BREATH.scaleMax,
+        opacity: 0,
+        transformOrigin: "center center"
+      });
+    });
+    
+    outerStrokes.forEach(shape => {
+      gsap.set(shape, {
+        scale: OUTER_BREATH.scaleMax,
+        opacity: 0,
+        transformOrigin: "center center"
+      });
+    });
+
+    // Center portal setup
+    let centerShapes = [];
+    let centerMode = "static";
+    let CENTER_BREATH = null;
+    
+    if (centerConfig && (centerConfig.mode === "synced" || centerConfig.mode === "reversed")) {
+      centerMode = centerConfig.mode;
+      
+      const centerFill = centerConfig.fill || "#ffffff";
+      const centerOpacityMax = centerConfig.opacity ?? 0.8;
+      const centerOpacityMin = centerConfig.opacityMin ?? 0.2;
+      
+      CENTER_BREATH = {
+        scaleMin: centerConfig.scaleMin ?? 0.88,
+        scaleMax: centerConfig.scaleMax ?? 1.0,
+        opacityMin: centerOpacityMin,
+        opacityMax: centerOpacityMax,
+        holdScale: BREATH_DEFAULTS.holdScale,
+        holdOpacity: BREATH_DEFAULTS.holdOpacity
+      };
+      
+      const centerFillEl = document.getElementById(CENTER_PORTAL_FILL_ID);
+      const centerStrokeEl = document.getElementById(CENTER_PORTAL_STROKE_ID);
+      
+      if (centerFillEl) {
+        centerShapes = [centerFillEl, centerStrokeEl].filter(Boolean);
+        
+        const isReversed = centerMode === "reversed";
+        const targetScale = isReversed ? CENTER_BREATH.scaleMin : CENTER_BREATH.scaleMax;
+        
+        gsap.set(centerFillEl, {
+          fill: centerFill,
+          scale: targetScale,
+          opacity: 0,
+          transformOrigin: "center center"
+        });
+        
+        if (centerStrokeEl) {
+          gsap.set(centerStrokeEl, {
+            scale: targetScale,
+            opacity: 0,
+            transformOrigin: "center center"
+          });
+        }
+      }
+    }
+
+    // Build master timeline with sequence
+    const masterTl = gsap.timeline();
+    
+    // Log the sequence
+    console.log(`🌬️ Breath Sequence: ${sequence.length} stages`);
+    sequence.forEach((stage, i) => {
+      const timing = BREATH_PRESETS[stage.preset] || BREATH_PRESETS.coherent;
+      const cycleDuration = timing.inhale + timing.holdIn + timing.exhale + timing.holdOut;
+      const cycles = stage.cycles === -1 ? '∞' : stage.cycles;
+      console.log(`   ${i + 1}. ${stage.preset}: ${cycles} cycles (${cycleDuration}s each)`);
+    });
+
+    // Intro fade-in
+    masterTl.to(outerShapes, {
+      opacity: OUTER_BREATH.opacityMax,
+      duration: 1.5,
+      ease: "sine.inOut"
+    }, 0);
+    
+    if (centerShapes.length > 0 && CENTER_BREATH) {
+      const centerTargetOpacity = centerMode === "reversed" 
+        ? CENTER_BREATH.opacityMin 
+        : CENTER_BREATH.opacityMax;
+      
+      masterTl.to(centerShapes, {
+        opacity: centerTargetOpacity,
+        duration: 1.5,
+        ease: "sine.inOut"
+      }, 0);
+    }
+
+    // Add each stage of the sequence
+    let currentPos = 1.5; // Start after intro fade-in
+    
+    sequence.forEach((stage, index) => {
+      const preset = stage.preset;
+      const cycles = stage.cycles;
+      const isLast = index === sequence.length - 1;
+      
+      // For the last stage with -1 cycles, repeat infinitely
+      // For other stages, repeat (cycles - 1) times (since first play counts as 1)
+      const repeatCount = cycles === -1 ? -1 : cycles - 1;
+      
+      const { timeline: breathTl, cycleDuration } = createBreathCycle(
+        preset, 
+        outerShapes, 
+        OUTER_BREATH, 
+        centerShapes, 
+        CENTER_BREATH, 
+        centerMode, 
+        repeatCount
+      );
+      
+      // Add label for this stage
+      masterTl.addLabel(`stage_${index}`, currentPos);
+      masterTl.add(breathTl, currentPos);
+      
+      // Calculate duration for this stage (if not infinite)
+      if (cycles !== -1) {
+        const stageDuration = cycleDuration * cycles;
+        currentPos += stageDuration;
+        console.log(`   Stage ${index + 1} duration: ${stageDuration}s`);
+      }
+    });
+
+    console.log(`✅ Breath sequence timeline created`);
+    return masterTl;
+  }
+
+  // ============================================================
+  // BREATHING ANIMATION (Single preset - wrapper for backward compatibility)
   // ============================================================
   
   function createBreathingAnimation(preset, outerConfig = {}, centerConfig = null) {
@@ -551,7 +884,8 @@
     window._sceneTimelines = [];
     
     const sceneName = config.name || "Custom Scene";
-    const breathPreset = config.breathPreset || "deepCalm";
+    const breathPreset = config.breathPreset || null;
+    const breathSequence = config.breathSequence || null;
     const outerPortalsConfig = config.outerPortals || {};
     const innerPortalsConfig = config.innerPortals || null;
     const centerPortalConfig = config.centerPortal || null;
@@ -560,7 +894,11 @@
     const autoStartBreathing = config.autoStartBreathing ?? true;
 
     console.log(`🎬 Scene Builder: ${sceneName}`);
-    console.log(`   Breath preset: ${breathPreset}`);
+    if (breathSequence) {
+      console.log(`   Breath mode: progressive sequence (${breathSequence.length} stages)`);
+    } else {
+      console.log(`   Breath preset: ${breathPreset || 'coherent'}`);
+    }
     console.log(`   Facet groups: ${facetGroups.length}`);
 
     // Animate facet groups
@@ -576,12 +914,19 @@
       allTweens.push(...innerTweens);
     }
 
-    // Breathing (outer + center on same timeline)
+    // Breathing (supports single preset OR progressive sequence)
     let breathTimeline = null;
     
     const startBreathing = () => {
-      // Pass both outer and center config to create unified timeline
-      breathTimeline = createBreathingAnimation(breathPreset, outerPortalsConfig, centerPortalConfig);
+      if (breathSequence && breathSequence.length > 0) {
+        // Progressive breathing sequence
+        breathTimeline = createBreathSequence(breathSequence, outerPortalsConfig, centerPortalConfig);
+      } else {
+        // Single preset (default to 'coherent' if not specified)
+        const preset = breathPreset || 'coherent';
+        breathTimeline = createBreathingAnimation(preset, outerPortalsConfig, centerPortalConfig);
+      }
+      
       if (breathTimeline) {
         window._breathTimeline = breathTimeline;
         window._sceneTimelines.push(breathTimeline);
@@ -697,6 +1042,8 @@
     sceneBuilder,
     stopAllAnimations,
     createBreathingAnimation,
+    createBreathSequence,
+    createBreathCycle,
     animateInnerPortals,
     getShape,
     getShapes,
@@ -708,7 +1055,8 @@
     CENTER_PORTAL_FILL_ID
   };
 
-  console.log("🎬 Scene Builder v1.2.3 loaded");
+  console.log("🎬 Scene Builder v1.3.0 loaded");
+  console.log("   Supports: breathPreset (single) or breathSequence (progressive)");
   console.log("═══════════════════════════════════════════════════════");
 
 })();
