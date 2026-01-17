@@ -1,9 +1,14 @@
 /*--------------------------------------------------------------
   Awakening Heart : Breath-Reactive Audio
-  Version: 1.0.0 | Date: 2025-01-17
+  Version: 1.0.1 | Date: 2025-01-17
   
   Web Audio API system that modulates audio in sync with breath.
   Designed to work with the sceneBuilder breath timeline.
+  
+  CHANGES in v1.0.1:
+  - Deferred AudioContext creation until start() (requires user interaction)
+  - Prevents errors when init() is called before user interacts with page
+  - Added isConnected state to track Web Audio node connection
   
   Features:
   - Gain modulation (volume swells with exhale)
@@ -36,7 +41,9 @@ window.AHBreathAudio = (() => {
   let gainNode = null;
   let filterNode = null;
   let audioElement = null;
+  let storedConfig = null;
   let isInitialized = false;
+  let isConnected = false;
   let isPlaying = false;
 
   // Default parameter ranges
@@ -63,20 +70,20 @@ window.AHBreathAudio = (() => {
     _filterFreq: DEFAULTS.filterMax,
     _masterVolume: DEFAULTS.masterVolume,
     
-    // Gain with setter that updates Web Audio
+    // Gain with setter that updates Web Audio (safe if not connected)
     get gain() { return this._gain; },
     set gain(value) {
       this._gain = value;
-      if (gainNode) {
+      if (gainNode && audioContext) {
         gainNode.gain.setTargetAtTime(value * this._masterVolume, audioContext.currentTime, 0.015);
       }
     },
     
-    // Filter frequency with setter that updates Web Audio
+    // Filter frequency with setter that updates Web Audio (safe if not connected)
     get filterFreq() { return this._filterFreq; },
     set filterFreq(value) {
       this._filterFreq = value;
-      if (filterNode) {
+      if (filterNode && audioContext) {
         filterNode.frequency.setTargetAtTime(value, audioContext.currentTime, 0.015);
       }
     },
@@ -86,7 +93,7 @@ window.AHBreathAudio = (() => {
     set masterVolume(value) {
       this._masterVolume = value;
       // Reapply gain with new master
-      if (gainNode) {
+      if (gainNode && audioContext) {
         gainNode.gain.setTargetAtTime(this._gain * value, audioContext.currentTime, 0.015);
       }
     }
@@ -105,17 +112,38 @@ window.AHBreathAudio = (() => {
     // Merge options with defaults
     const config = { ...DEFAULTS, ...options };
     
-    console.log('🌬️ Breath Audio: Initializing...');
+    console.log('🌬️ Breath Audio: Pre-initializing (will fully init on start)');
+    
+    // Store element and config for later - don't create AudioContext yet
+    // (AudioContext requires user interaction)
+    audioElement = element;
+    storedConfig = config;
+    
+    // Set initial param values
+    params._gain = config.gainMax;
+    params._filterFreq = config.filterMax;
+    params._masterVolume = config.masterVolume;
+    
+    isInitialized = true;  // Mark as ready for start()
+    
+    console.log('✅ Breath Audio: Ready (will connect on start)');
+    console.log(`   Gain range: ${config.gainMin} → ${config.gainMax}`);
+    console.log(`   Filter range: ${config.filterMin}Hz → ${config.filterMax}Hz`);
+    
+    return true;
+  }
+  
+  // Actually connect the Web Audio nodes (called on first start)
+  async function connectAudioNodes() {
+    if (isConnected || !audioElement) return false;
     
     try {
-      // Create or resume audio context
+      // Create audio context (requires user interaction)
       audioContext = new (window.AudioContext || window.webkitAudioContext)();
       
       if (audioContext.state === 'suspended') {
         await audioContext.resume();
       }
-      
-      audioElement = element;
       
       // Create source from audio element
       sourceNode = audioContext.createMediaElementSource(audioElement);
@@ -127,29 +155,21 @@ window.AHBreathAudio = (() => {
       // Create low-pass filter (brightness control)
       filterNode = audioContext.createBiquadFilter();
       filterNode.type = 'lowpass';
-      filterNode.frequency.value = config.filterMax;
-      filterNode.Q.value = config.filterQ;
+      filterNode.frequency.value = storedConfig.filterMax;
+      filterNode.Q.value = storedConfig.filterQ;
       
       // Connect the chain: source → filter → gain → destination
       sourceNode.connect(filterNode);
       filterNode.connect(gainNode);
       gainNode.connect(audioContext.destination);
       
-      // Set initial param values
-      params._gain = config.gainMax;
-      params._filterFreq = config.filterMax;
-      params._masterVolume = config.masterVolume;
-      
-      isInitialized = true;
-      
-      console.log('✅ Breath Audio: Initialized');
-      console.log(`   Gain range: ${config.gainMin} → ${config.gainMax}`);
-      console.log(`   Filter range: ${config.filterMin}Hz → ${config.filterMax}Hz`);
+      isConnected = true;
+      console.log('🌬️ Breath Audio: Web Audio nodes connected');
       
       return true;
       
     } catch (e) {
-      console.error('❌ Breath Audio: Init failed', e);
+      console.error('❌ Breath Audio: Failed to connect audio nodes', e);
       return false;
     }
   }
@@ -172,6 +192,15 @@ window.AHBreathAudio = (() => {
     }
     
     try {
+      // Connect Web Audio nodes on first start (requires user interaction)
+      if (!isConnected) {
+        const connected = await connectAudioNodes();
+        if (!connected) {
+          console.warn('⚠️ Breath Audio: Could not connect audio nodes');
+          return false;
+        }
+      }
+      
       if (audioContext.state === 'suspended') {
         await audioContext.resume();
       }
@@ -395,7 +424,9 @@ window.AHBreathAudio = (() => {
     }
     
     audioElement = null;
+    storedConfig = null;
     isInitialized = false;
+    isConnected = false;
     isPlaying = false;
     
     console.log('🌬️ Breath Audio: Destroyed');
@@ -408,6 +439,7 @@ window.AHBreathAudio = (() => {
   function getState() {
     return {
       isInitialized,
+      isConnected,
       isPlaying,
       gain: params._gain,
       filterFreq: params._filterFreq,
@@ -444,6 +476,6 @@ window.AHBreathAudio = (() => {
 
 })();
 
-console.log('🌬️ Breath Audio v1.0.0 loaded');
+console.log('🌬️ Breath Audio v1.0.1 loaded');
 console.log('   Use: AHBreathAudio.init(audioElement)');
-console.log('   Then: AHBreathAudio.addToTimeline(timeline, timing)');
+console.log('   Then: AHBreathAudio.start() (connects Web Audio on first call)');
