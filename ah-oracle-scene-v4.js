@@ -1,6 +1,11 @@
 /*--------------------------------------------------------------
   Awakening Heart : Oracle Scene Controller
-  Version: 4.2.1 | Date: 2025-01-16
+  Version: 4.3.0 | Date: 2025-01-17
+  
+  CHANGES in v4.3.0:
+  - Integrated AHBreathAudio for breath-reactive audio
+  - Breath audio starts in meditation mode, stops on exit
+  - Audio gain/filter modulate in sync with breath timeline
   
   CHANGES in v4.2.1:
   - Fixed center divination not overriding breathing animation
@@ -457,8 +462,18 @@
       State.meditationAudio.loop = true;
     }
     
-    if (State.breathAudio) {
+    // Initialize breath-reactive audio system (AHBreathAudio)
+    if (State.breathAudio && window.AHBreathAudio) {
+      try {
+        await window.AHBreathAudio.init(State.breathAudio);
+        console.log('🌬️ Breath-reactive audio initialized');
+      } catch (e) {
+        console.warn('⚠️ Breath audio init failed:', e);
+      }
+    } else if (State.breathAudio) {
+      // Fallback: simple breath audio setup without reactive system
       State.breathAudio.volume = CONFIG.audioVolume;
+      State.breathAudio.loop = true;
     }
   }
   
@@ -797,6 +812,14 @@
       onComplete: () => {
         console.log('✅ Meditation mode active');
         enableCenterDivination();
+        
+        // Start breath-reactive audio if available and audio is enabled
+        if (window.AHBreathAudio?.getState()?.isInitialized) {
+          const audioState = window.AHAudioState?.getState();
+          if (audioState?.isPlaying) {
+            window.AHBreathAudio.start();
+          }
+        }
       }
     });
     
@@ -854,6 +877,11 @@
     if (!State.inMeditation) return;
     
     console.log('📖 Exiting meditation mode');
+    
+    // Stop breath-reactive audio
+    if (window.AHBreathAudio?.getState()?.isPlaying) {
+      window.AHBreathAudio.stop();
+    }
     
     disableCenterDivination();
     
