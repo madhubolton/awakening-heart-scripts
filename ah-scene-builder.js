@@ -1,8 +1,19 @@
 /*--------------------------------------------------------------
   Awakening Heart : Scene Builder
-  Version: 1.3.0 | Date: 2025-01-17
+  Version: 1.3.2 | Date: 2025-01-17
   
   Unified animation system for Metatron facets and portals.
+  
+  CHANGES in v1.3.2:
+  - Added try-catch error handling for center portal setup
+  - Added try-catch around breathing animation startup
+  - Better logging for center portal element detection
+  - Prevents breathing errors from breaking facet animations
+  
+  CHANGES in v1.3.1:
+  - Integrated breath-reactive audio (AHBreathAudio)
+  - Audio gain + filter modulate in sync with breath
+  - Refactored createBreathingAnimation to use createBreathCycle
   
   CHANGES in v1.3.0:
   - Added progressive breath sequencing (breathSequence config)
@@ -140,16 +151,20 @@
 
   // ============================================================
   // BREATHING: CREATE SINGLE BREATH CYCLE (helper)
+  // Includes optional breath audio modulation
   // ============================================================
   
-  function createBreathCycle(preset, outerShapes, OUTER_BREATH, centerShapes, CENTER_BREATH, centerMode, repeatCount = -1) {
+  function createBreathCycle(preset, outerShapes, OUTER_BREATH, centerShapes, CENTER_BREATH, centerMode, repeatCount = -1, includeAudio = true) {
     const timing = BREATH_PRESETS[preset] || BREATH_PRESETS.coherent;
     const cycle = timing.inhale + timing.holdIn + timing.exhale + timing.holdOut;
     
     const breathTl = gsap.timeline({ repeat: repeatCount });
     let pos = 0;
+    
+    // Check if breath audio is available
+    const hasBreathAudio = includeAudio && window.AHBreathAudio?.params && window.AHBreathAudio?.getState()?.isInitialized;
 
-    // INHALE: Contract + Dim
+    // INHALE: Contract + Dim (+ audio: quieter, darker)
     breathTl.to(outerShapes, {
       scale: OUTER_BREATH.scaleMin,
       opacity: OUTER_BREATH.opacityMin,
@@ -173,6 +188,17 @@
           ease: "sine.inOut"
         }, pos);
       }
+    }
+    
+    // Audio: Inhale - quieter, filter closes
+    if (hasBreathAudio) {
+      const inhaleParams = window.AHBreathAudio.getInhaleParams();
+      breathTl.to(window.AHBreathAudio.params, {
+        gain: inhaleParams.gain,
+        filterFreq: inhaleParams.filterFreq,
+        duration: timing.inhale,
+        ease: "sine.inOut"
+      }, pos);
     }
     
     pos += timing.inhale;
@@ -222,10 +248,31 @@
         }
       }
       
+      // Audio: Hold-in micro-motion
+      if (hasBreathAudio) {
+        const inhaleParams = window.AHBreathAudio.getInhaleParams();
+        const holdVar = { 
+          gain: inhaleParams.gain * 1.08, 
+          filterFreq: inhaleParams.filterFreq * 1.08 
+        };
+        breathTl.to(window.AHBreathAudio.params, {
+          gain: holdVar.gain,
+          filterFreq: holdVar.filterFreq,
+          duration: timing.holdIn / 2,
+          ease: "sine.inOut"
+        }, pos);
+        breathTl.to(window.AHBreathAudio.params, {
+          gain: inhaleParams.gain,
+          filterFreq: inhaleParams.filterFreq,
+          duration: timing.holdIn / 2,
+          ease: "sine.inOut"
+        }, pos + timing.holdIn / 2);
+      }
+      
       pos += timing.holdIn;
     }
 
-    // EXHALE: Expand + Brighten
+    // EXHALE: Expand + Brighten (+ audio: louder, brighter)
     breathTl.to(outerShapes, {
       scale: OUTER_BREATH.scaleMax,
       opacity: OUTER_BREATH.opacityMax,
@@ -249,6 +296,17 @@
           ease: "sine.inOut"
         }, pos);
       }
+    }
+    
+    // Audio: Exhale - louder, filter opens
+    if (hasBreathAudio) {
+      const exhaleParams = window.AHBreathAudio.getExhaleParams();
+      breathTl.to(window.AHBreathAudio.params, {
+        gain: exhaleParams.gain,
+        filterFreq: exhaleParams.filterFreq,
+        duration: timing.exhale,
+        ease: "sine.inOut"
+      }, pos);
     }
     
     pos += timing.exhale;
@@ -296,6 +354,27 @@
             ease: "sine.inOut"
           }, pos + timing.holdOut / 2);
         }
+      }
+      
+      // Audio: Hold-out micro-motion
+      if (hasBreathAudio) {
+        const exhaleParams = window.AHBreathAudio.getExhaleParams();
+        const holdVar = { 
+          gain: exhaleParams.gain * 0.95, 
+          filterFreq: exhaleParams.filterFreq * 0.95 
+        };
+        breathTl.to(window.AHBreathAudio.params, {
+          gain: holdVar.gain,
+          filterFreq: holdVar.filterFreq,
+          duration: timing.holdOut / 2,
+          ease: "sine.inOut"
+        }, pos);
+        breathTl.to(window.AHBreathAudio.params, {
+          gain: exhaleParams.gain,
+          filterFreq: exhaleParams.filterFreq,
+          duration: timing.holdOut / 2,
+          ease: "sine.inOut"
+        }, pos + timing.holdOut / 2);
       }
     }
 
@@ -355,44 +434,59 @@
     let CENTER_BREATH = null;
     
     if (centerConfig && (centerConfig.mode === "synced" || centerConfig.mode === "reversed")) {
-      centerMode = centerConfig.mode;
-      
-      const centerFill = centerConfig.fill || "#ffffff";
-      const centerOpacityMax = centerConfig.opacity ?? 0.8;
-      const centerOpacityMin = centerConfig.opacityMin ?? 0.2;
-      
-      CENTER_BREATH = {
-        scaleMin: centerConfig.scaleMin ?? 0.88,
-        scaleMax: centerConfig.scaleMax ?? 1.0,
-        opacityMin: centerOpacityMin,
-        opacityMax: centerOpacityMax,
-        holdScale: BREATH_DEFAULTS.holdScale,
-        holdOpacity: BREATH_DEFAULTS.holdOpacity
-      };
-      
-      const centerFillEl = document.getElementById(CENTER_PORTAL_FILL_ID);
-      const centerStrokeEl = document.getElementById(CENTER_PORTAL_STROKE_ID);
-      
-      if (centerFillEl) {
-        centerShapes = [centerFillEl, centerStrokeEl].filter(Boolean);
+      try {
+        centerMode = centerConfig.mode;
         
-        const isReversed = centerMode === "reversed";
-        const targetScale = isReversed ? CENTER_BREATH.scaleMin : CENTER_BREATH.scaleMax;
+        const centerFill = centerConfig.fill || "#ffffff";
+        const centerOpacityMax = centerConfig.opacity ?? 0.8;
+        const centerOpacityMin = centerConfig.opacityMin ?? 0.2;
         
-        gsap.set(centerFillEl, {
-          fill: centerFill,
-          scale: targetScale,
-          opacity: 0,
-          transformOrigin: "center center"
-        });
+        CENTER_BREATH = {
+          scaleMin: centerConfig.scaleMin ?? 0.88,
+          scaleMax: centerConfig.scaleMax ?? 1.0,
+          opacityMin: centerOpacityMin,
+          opacityMax: centerOpacityMax,
+          holdScale: BREATH_DEFAULTS.holdScale,
+          holdOpacity: BREATH_DEFAULTS.holdOpacity
+        };
         
-        if (centerStrokeEl) {
-          gsap.set(centerStrokeEl, {
+        const centerFillEl = document.getElementById(CENTER_PORTAL_FILL_ID);
+        const centerStrokeEl = document.getElementById(CENTER_PORTAL_STROKE_ID);
+        
+        console.log(`🎯 Center portal elements: fill=${!!centerFillEl}, stroke=${!!centerStrokeEl}`);
+        
+        if (centerFillEl) {
+          centerShapes = [centerFillEl, centerStrokeEl].filter(Boolean);
+          
+          const isReversed = centerMode === "reversed";
+          const targetScale = isReversed ? CENTER_BREATH.scaleMin : CENTER_BREATH.scaleMax;
+          
+          gsap.set(centerFillEl, {
+            fill: centerFill,
             scale: targetScale,
             opacity: 0,
             transformOrigin: "center center"
           });
+          
+          if (centerStrokeEl) {
+            gsap.set(centerStrokeEl, {
+              scale: targetScale,
+              opacity: 0,
+              transformOrigin: "center center"
+            });
+          }
+          
+          console.log(`🎯 Center portal: ${centerMode} mode, ${centerShapes.length} shapes`);
+        } else {
+          console.warn("⚠️ Center portal fill element (P_C) not found, falling back to static");
+          centerMode = "static";
+          CENTER_BREATH = null;
         }
+      } catch (e) {
+        console.error("❌ Error setting up center portal:", e);
+        centerMode = "static";
+        CENTER_BREATH = null;
+        centerShapes = [];
       }
     }
 
@@ -628,160 +722,19 @@
     
     // ============================================================
     // BREATH CYCLE (repeats infinitely after intro)
+    // Uses createBreathCycle which includes audio modulation
     // ============================================================
     
-    const breathTl = gsap.timeline({ repeat: -1 });
-    let pos = 0;
-
-    // INHALE: Contract + Dim
-    breathTl.to(outerShapes, {
-      scale: OUTER_BREATH.scaleMin,
-      opacity: OUTER_BREATH.opacityMin,
-      duration: timing.inhale,
-      ease: "sine.inOut"
-    }, pos);
-    
-    if (centerShapes.length > 0 && CENTER_BREATH) {
-      if (centerMode === "reversed") {
-        breathTl.to(centerShapes, {
-          scale: CENTER_BREATH.scaleMax,
-          opacity: CENTER_BREATH.opacityMax,
-          duration: timing.inhale,
-          ease: "sine.inOut"
-        }, pos);
-      } else {
-        breathTl.to(centerShapes, {
-          scale: CENTER_BREATH.scaleMin,
-          opacity: CENTER_BREATH.opacityMin,
-          duration: timing.inhale,
-          ease: "sine.inOut"
-        }, pos);
-      }
-    }
-    
-    pos += timing.inhale;
-
-    // HOLD-IN
-    if (timing.holdIn > 0) {
-      breathTl.to(outerShapes, {
-        scale: OUTER_BREATH.scaleMin + OUTER_BREATH.holdScale,
-        opacity: OUTER_BREATH.opacityMin + OUTER_BREATH.holdOpacity,
-        duration: timing.holdIn / 2,
-        ease: "sine.inOut"
-      }, pos);
-      breathTl.to(outerShapes, {
-        scale: OUTER_BREATH.scaleMin,
-        opacity: OUTER_BREATH.opacityMin,
-        duration: timing.holdIn / 2,
-        ease: "sine.inOut"
-      }, pos + timing.holdIn / 2);
-      
-      if (centerShapes.length > 0 && CENTER_BREATH) {
-        if (centerMode === "reversed") {
-          breathTl.to(centerShapes, {
-            scale: CENTER_BREATH.scaleMax - CENTER_BREATH.holdScale,
-            opacity: CENTER_BREATH.opacityMax - CENTER_BREATH.holdOpacity,
-            duration: timing.holdIn / 2,
-            ease: "sine.inOut"
-          }, pos);
-          breathTl.to(centerShapes, {
-            scale: CENTER_BREATH.scaleMax,
-            opacity: CENTER_BREATH.opacityMax,
-            duration: timing.holdIn / 2,
-            ease: "sine.inOut"
-          }, pos + timing.holdIn / 2);
-        } else {
-          breathTl.to(centerShapes, {
-            scale: CENTER_BREATH.scaleMin + CENTER_BREATH.holdScale,
-            opacity: CENTER_BREATH.opacityMin + CENTER_BREATH.holdOpacity,
-            duration: timing.holdIn / 2,
-            ease: "sine.inOut"
-          }, pos);
-          breathTl.to(centerShapes, {
-            scale: CENTER_BREATH.scaleMin,
-            opacity: CENTER_BREATH.opacityMin,
-            duration: timing.holdIn / 2,
-            ease: "sine.inOut"
-          }, pos + timing.holdIn / 2);
-        }
-      }
-      
-      pos += timing.holdIn;
-    }
-
-    // EXHALE: Expand + Brighten
-    breathTl.to(outerShapes, {
-      scale: OUTER_BREATH.scaleMax,
-      opacity: OUTER_BREATH.opacityMax,
-      duration: timing.exhale,
-      ease: "sine.inOut"
-    }, pos);
-    
-    if (centerShapes.length > 0 && CENTER_BREATH) {
-      if (centerMode === "reversed") {
-        breathTl.to(centerShapes, {
-          scale: CENTER_BREATH.scaleMin,
-          opacity: CENTER_BREATH.opacityMin,
-          duration: timing.exhale,
-          ease: "sine.inOut"
-        }, pos);
-      } else {
-        breathTl.to(centerShapes, {
-          scale: CENTER_BREATH.scaleMax,
-          opacity: CENTER_BREATH.opacityMax,
-          duration: timing.exhale,
-          ease: "sine.inOut"
-        }, pos);
-      }
-    }
-    
-    pos += timing.exhale;
-
-    // HOLD-OUT
-    if (timing.holdOut > 0) {
-      breathTl.to(outerShapes, {
-        scale: OUTER_BREATH.scaleMax - OUTER_BREATH.holdScale,
-        opacity: OUTER_BREATH.opacityMax - OUTER_BREATH.holdOpacity,
-        duration: timing.holdOut / 2,
-        ease: "sine.inOut"
-      }, pos);
-      breathTl.to(outerShapes, {
-        scale: OUTER_BREATH.scaleMax,
-        opacity: OUTER_BREATH.opacityMax,
-        duration: timing.holdOut / 2,
-        ease: "sine.inOut"
-      }, pos + timing.holdOut / 2);
-      
-      if (centerShapes.length > 0 && CENTER_BREATH) {
-        if (centerMode === "reversed") {
-          breathTl.to(centerShapes, {
-            scale: CENTER_BREATH.scaleMin + CENTER_BREATH.holdScale,
-            opacity: CENTER_BREATH.opacityMin + CENTER_BREATH.holdOpacity,
-            duration: timing.holdOut / 2,
-            ease: "sine.inOut"
-          }, pos);
-          breathTl.to(centerShapes, {
-            scale: CENTER_BREATH.scaleMin,
-            opacity: CENTER_BREATH.opacityMin,
-            duration: timing.holdOut / 2,
-            ease: "sine.inOut"
-          }, pos + timing.holdOut / 2);
-        } else {
-          breathTl.to(centerShapes, {
-            scale: CENTER_BREATH.scaleMax - CENTER_BREATH.holdScale,
-            opacity: CENTER_BREATH.opacityMax - CENTER_BREATH.holdOpacity,
-            duration: timing.holdOut / 2,
-            ease: "sine.inOut"
-          }, pos);
-          breathTl.to(centerShapes, {
-            scale: CENTER_BREATH.scaleMax,
-            opacity: CENTER_BREATH.opacityMax,
-            duration: timing.holdOut / 2,
-            ease: "sine.inOut"
-          }, pos + timing.holdOut / 2);
-        }
-      }
-    }
+    const { timeline: breathTl } = createBreathCycle(
+      preset, 
+      outerShapes, 
+      OUTER_BREATH, 
+      centerShapes, 
+      CENTER_BREATH, 
+      centerMode, 
+      -1,  // repeat infinitely
+      true // include audio
+    );
 
     // Add the repeating breath cycle to master timeline after intro
     masterTl.add(breathTl, 1.5);  // Start breath cycle after fade-in completes
@@ -918,18 +871,22 @@
     let breathTimeline = null;
     
     const startBreathing = () => {
-      if (breathSequence && breathSequence.length > 0) {
-        // Progressive breathing sequence
-        breathTimeline = createBreathSequence(breathSequence, outerPortalsConfig, centerPortalConfig);
-      } else {
-        // Single preset (default to 'coherent' if not specified)
-        const preset = breathPreset || 'coherent';
-        breathTimeline = createBreathingAnimation(preset, outerPortalsConfig, centerPortalConfig);
-      }
-      
-      if (breathTimeline) {
-        window._breathTimeline = breathTimeline;
-        window._sceneTimelines.push(breathTimeline);
+      try {
+        if (breathSequence && breathSequence.length > 0) {
+          // Progressive breathing sequence
+          breathTimeline = createBreathSequence(breathSequence, outerPortalsConfig, centerPortalConfig);
+        } else {
+          // Single preset (default to 'coherent' if not specified)
+          const preset = breathPreset || 'coherent';
+          breathTimeline = createBreathingAnimation(preset, outerPortalsConfig, centerPortalConfig);
+        }
+        
+        if (breathTimeline) {
+          window._breathTimeline = breathTimeline;
+          window._sceneTimelines.push(breathTimeline);
+        }
+      } catch (e) {
+        console.error("❌ Error starting breathing animation:", e);
       }
     };
     
@@ -1055,8 +1012,9 @@
     CENTER_PORTAL_FILL_ID
   };
 
-  console.log("🎬 Scene Builder v1.3.0 loaded");
+  console.log("🎬 Scene Builder v1.3.2 loaded");
   console.log("   Supports: breathPreset (single) or breathSequence (progressive)");
+  console.log("   Audio: Auto-integrates with AHBreathAudio if initialized");
   console.log("═══════════════════════════════════════════════════════");
 
 })();
