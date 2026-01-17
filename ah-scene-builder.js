@@ -1,8 +1,11 @@
 /*--------------------------------------------------------------
   Awakening Heart : Scene Builder
-  Version: 1.2.5 | Date: 2025-01-16
+  Version: 1.2.6 | Date: 2025-01-16
   
   Unified animation system for Metatron facets and portals.
+  
+  CHANGES in v1.2.6:
+  - Added 'coherent' breath preset (5s in, 5s out) - easiest to drop into
   
   CHANGES in v1.2.5:
   - Fixed breathing loop causing portals to flash/disappear
@@ -32,12 +35,13 @@
   // ============================================================
   
   const BREATH_PRESETS = {
-    resonance:   { inhale: 4, holdIn: 0, exhale: 6, holdOut: 0 },
-    deepCalm:    { inhale: 4, holdIn: 1, exhale: 8, holdOut: 1 },
-    easeAnxiety: { inhale: 4, holdIn: 0, exhale: 7, holdOut: 0 },
-    box:         { inhale: 4, holdIn: 4, exhale: 4, holdOut: 4 },
-    relaxation:  { inhale: 4, holdIn: 7, exhale: 8, holdOut: 0 },
-    simple:      { inhale: 3, holdIn: 0, exhale: 3, holdOut: 0 }
+    coherent:    { inhale: 5, holdIn: 0, exhale: 5, holdOut: 0 },  // 6 breaths/min - easiest to drop into
+    resonance:   { inhale: 4, holdIn: 0, exhale: 6, holdOut: 0 },  // 6 breaths/min - slight exhale bias
+    deepCalm:    { inhale: 4, holdIn: 1, exhale: 8, holdOut: 1 },  // 4.3 breaths/min - requires practice
+    easeAnxiety: { inhale: 4, holdIn: 0, exhale: 7, holdOut: 0 },  // 5.5 breaths/min
+    box:         { inhale: 4, holdIn: 4, exhale: 4, holdOut: 4 },  // Box breathing
+    relaxation:  { inhale: 4, holdIn: 7, exhale: 8, holdOut: 0 },  // 4-7-8 pattern
+    simple:      { inhale: 3, holdIn: 0, exhale: 3, holdOut: 0 }   // Gentle entry point
   };
 
   // ============================================================
