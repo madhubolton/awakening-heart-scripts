@@ -1,6 +1,10 @@
 /*--------------------------------------------------------------
   Awakening Heart : Oracle Scene Controller
-  Version: 4.3.0 | Date: 2025-01-17
+  Version: 4.3.1 | Date: 2025-01-17
+  
+  CHANGES in v4.3.1:
+  - Disabled old playBreathSound() during content navigation
+  - Breath audio now only plays in meditation mode via AHBreathAudio
   
   CHANGES in v4.3.0:
   - Integrated AHBreathAudio for breath-reactive audio
@@ -730,7 +734,8 @@
       }
     });
     
-    tl.add(() => playBreathSound());
+    // OLD: playBreathSound() - disabled, now using AHBreathAudio in meditation mode only
+    // tl.add(() => playBreathSound());
     
     if (currentBlock) {
       tl.add(breatheIn(currentBlock), 0);
