@@ -1,19 +1,17 @@
 /*--------------------------------------------------------------
   Awakening Heart : Scene Builder
-  Version: 1.4.1 | Date: 2025-01-18
+  Version: 1.4.2 | Date: 2025-01-18
   
   Unified animation system for Metatron facets and portals.
+  
+  CHANGES in v1.4.2:
+  - Fixed: Breath sound only plays in MEDITATION mode (not philosophy/content)
+  - Fixed: Breath sound volume reduced (configurable via BREATH_SOUND_VOLUME)
   
   CHANGES in v1.4.1:
   - Fixed: Breath sound now plays ONCE at inhale start AND exhale start
   - Fixed: Breath sound respects audio toggle state
   - Removed loop from breath audio (plays as marker, not continuous)
-  
-  CHANGES in v1.4.0:
-  - REMOVED: AHBreathAudio gain/filter modulation (no longer needed)
-  - ADDED: Simple breath sound playback trigger at cycle start
-  - Breath sound recording now carries natural inhale/exhale character
-  - Simplified createBreathCycle function
   
   CHANGES in v1.3.2:
   - Added try-catch error handling for center portal setup
@@ -129,11 +127,18 @@
 
   // ============================================================
   // BREATH SOUND PLAYBACK (Triggers on inhale and exhale)
+  // Only plays in meditation mode
   // ============================================================
+  
+  const BREATH_SOUND_VOLUME = 0.15;  // Adjust this value (0.0 to 1.0)
   
   function playBreathSound() {
     const breathSound = document.getElementById('breathSound');
     if (!breathSound) return;
+    
+    // Only play in meditation mode
+    const inMeditation = window.AHSceneController?.getState()?.inMeditation;
+    if (!inMeditation) return;
     
     // Check if audio is enabled via AHAudioState or fallback to meditation/background audio
     let audioEnabled = false;
@@ -149,9 +154,10 @@
     
     if (!audioEnabled) return;
     
-    // Play once (not looped) - reset and play
+    // Play once (not looped) - reset and play at reduced volume
     breathSound.currentTime = 0;
-    breathSound.loop = false;  // Ensure no looping
+    breathSound.volume = BREATH_SOUND_VOLUME;
+    breathSound.loop = false;
     breathSound.play().catch(e => console.warn('🌬️ Breath sound play failed:', e));
   }
 
@@ -955,8 +961,8 @@
     CENTER_PORTAL_FILL_ID
   };
 
-  console.log("🎬 Scene Builder v1.4.1 loaded");
-  console.log("   Breath audio: Plays once on inhale + once on exhale");
+  console.log("🎬 Scene Builder v1.4.2 loaded");
+  console.log("   Breath audio: Plays on inhale/exhale (meditation mode only)");
   console.log("   Supports: breathPreset (single) or breathSequence (progressive)");
   console.log("═══════════════════════════════════════════════════════");
 
