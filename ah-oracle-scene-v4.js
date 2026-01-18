@@ -1,6 +1,10 @@
 /*--------------------------------------------------------------
   Awakening Heart : Oracle Scene Controller
-  Version: 4.4.0 | Date: 2025-01-18
+  Version: 4.4.1 | Date: 2025-01-18
+  
+  CHANGES in v4.4.1:
+  - Fixed: Breath audio no longer loops (plays once per trigger)
+  - Breath sound triggered by scene-builder at inhale/exhale transitions
   
   CHANGES in v4.4.0:
   - REMOVED: AHBreathAudio integration (no longer needed)
@@ -8,10 +12,6 @@
   - SIMPLIFIED: Audio handling - breath sound plays naturally
   - Breath recording now carries full inhale/exhale character
   - Meditation audio provides harmonic background
-  
-  CHANGES in v4.3.3:
-  - Fixed: Meditation audio now starts when enabling audio in meditation mode
-  - Audio toggle properly starts both meditation audio AND breath audio
   
   COMPLETE CYCLICAL FLOW:
   Entry Scene → Divination → New Scene Entry → Content Navigation → 
@@ -424,11 +424,11 @@
       State.meditationAudio.loop = true;
     }
     
-    // Simple breath audio setup - no modulation needed
+    // Simple breath audio setup - plays once per trigger, no loop
     if (State.breathAudio) {
       State.breathAudio.volume = CONFIG.audioVolume;
-      State.breathAudio.loop = true;
-      console.log('🌬️ Breath audio ready (natural recording)');
+      State.breathAudio.loop = false;  // Plays once per inhale/exhale trigger
+      console.log('🌬️ Breath audio ready (plays on inhale/exhale)');
     }
   }
   
@@ -1256,8 +1256,8 @@
   
   async function init() {
     try {
-      console.log('💖 Oracle Scene Controller v4.4.0 initializing...');
-      console.log('   Audio: Simplified (natural breath recording)');
+      console.log('💖 Oracle Scene Controller v4.4.1 initializing...');
+      console.log('   Audio: Breath plays on inhale/exhale markers');
       
       cacheDOM();
       
