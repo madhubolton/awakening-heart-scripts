@@ -1,46 +1,17 @@
 /*--------------------------------------------------------------
   Awakening Heart : Oracle Scene Controller
-  Version: 4.3.3 | Date: 2025-01-17
+  Version: 4.4.0 | Date: 2025-01-18
+  
+  CHANGES in v4.4.0:
+  - REMOVED: AHBreathAudio integration (no longer needed)
+  - REMOVED: Breath-reactive gain/filter modulation code
+  - SIMPLIFIED: Audio handling - breath sound plays naturally
+  - Breath recording now carries full inhale/exhale character
+  - Meditation audio provides harmonic background
   
   CHANGES in v4.3.3:
   - Fixed: Meditation audio now starts when enabling audio in meditation mode
   - Audio toggle properly starts both meditation audio AND breath audio
-  
-  CHANGES in v4.3.2:
-  - Fixed: Breath audio now starts when enabling audio while in meditation mode
-  - Audio toggle checks meditation state and starts/stops breath audio accordingly
-  
-  CHANGES in v4.3.1:
-  - Disabled old playBreathSound() during content navigation
-  - Breath audio now only plays in meditation mode via AHBreathAudio
-  
-  CHANGES in v4.3.0:
-  - Integrated AHBreathAudio for breath-reactive audio
-  - Breath audio starts in meditation mode, stops on exit
-  - Audio gain/filter modulate in sync with breath timeline
-  
-  CHANGES in v4.2.1:
-  - Fixed center divination not overriding breathing animation
-  - Center portal breathing now continues in meditation mode
-  - enableCenterDivination only enables click, doesn't animate
-  
-  CHANGES in v4.2:
-  - Replaced window.metatron with new sceneBuilder system
-  - Scene controller now reads config and controls animation timing
-  - Breathing portals start after entry animation completes
-  - Facets can animate during content navigation (not just meditation)
-  - Removed dependency on ah-metatron.js and ah-animation-patterns.js
-  
-  CHANGES in v4.1:
-  - Fixed IIFE wrapper
-  - Responsive scaling for mobile devices
-  
-  CHANGES in v4.0:
-  - Click navigation with top/bottom zones (top=back, bottom=forward)
-  - Metatron breathes out on scene entry (consistent with content blocks)
-  - Enhanced randomizer debugging
-  - Skips empty content blocks during navigation
-  - No audio autoplay - user enables manually
   
   COMPLETE CYCLICAL FLOW:
   Entry Scene → Divination → New Scene Entry → Content Navigation → 
@@ -123,7 +94,6 @@
     scrollCooldown: 300,
     audioVolume: 0.35,
     audioFadeDuration: 1.0,
-    breathDuckAmount: 0.15,
     goddessDockY: responsiveScales.goddessDockY,
     goddessDockScale: responsiveScales.goddessDockScale,
     goddessCenterY: 0,
@@ -172,7 +142,7 @@
     meditationAudio: null,
     breathAudio: null,
     isTransitioning: false,
-    sceneConfig: null  // NEW: Store parsed scene config
+    sceneConfig: null
   };
 
   // ============================================================
@@ -219,7 +189,7 @@
       audioToggle: document.getElementById('audioToggle'),
       audioIcon: document.querySelector('#audioToggle svg, #audioToggle .icon-On'),
       
-      sceneConfig: document.getElementById('scene-config') || document.getElementById('scene-config-data')  // Supports both script tag and div
+      sceneConfig: document.getElementById('scene-config') || document.getElementById('scene-config-data')
     };
     
     const allBlocks = [
@@ -259,7 +229,7 @@
   }
 
   // ============================================================
-  // SCENE CONFIG READING (NEW - replaces ah-metatron.js)
+  // SCENE CONFIG READING
   // ============================================================
   
   function readSceneConfig() {
@@ -272,7 +242,6 @@
       const config = JSON.parse(DOM.sceneConfig.textContent.trim());
       console.log('📋 Scene config loaded:', config.name || 'Unnamed');
       
-      // Merge with defaults
       return {
         ...SCENE_CONFIG_DEFAULTS,
         ...config
@@ -284,7 +253,7 @@
   }
 
   // ============================================================
-  // SCENE ANIMATION CONTROL (NEW - replaces window.metatron calls)
+  // SCENE ANIMATION CONTROL
   // ============================================================
   
   function startSceneAnimations() {
@@ -301,9 +270,6 @@
     }
     
     console.log('✨ Starting scene animations:', config.name);
-    
-    // Call sceneBuilder with the config
-    // Breathing will start automatically (autoStartBreathing defaults to true)
     window.sceneBuilder(config);
   }
   
@@ -315,17 +281,12 @@
   }
   
   function startFacetAnimation() {
-    // In meditation mode, we may want different/enhanced facet behavior
-    // For now, facets are already running from sceneBuilder
-    // This function is kept for compatibility with meditation mode transitions
-    
     if (!window.activeScene) {
       console.log('ℹ️ No active scene - starting scene animations');
       startSceneAnimations();
       return;
     }
     
-    // If scene is paused, resume it
     if (window.activeScene.getState && window.activeScene.getState().isPaused) {
       window.activeScene.resume();
       console.log('▶️ Scene animations resumed');
@@ -360,7 +321,6 @@
     
     const validPool = pool.filter(s => s.url && s.url.startsWith('/scenes/') && s.id);
     console.log('🎲 Scene pool loaded:', validPool.length, 'valid oracle scenes');
-    console.log('📋 Pool contents:', validPool.map(s => ({ id: s.id, weight: s.weight })));
     
     return validPool;
   }
@@ -377,7 +337,6 @@
     try {
       const stored = localStorage.getItem(CONFIG.storageKeys.sceneHistory);
       const history = stored ? JSON.parse(stored) : [];
-      console.log('📚 Scene history:', history);
       return history;
     } catch (e) {
       console.warn('⚠️ Could not read scene history:', e);
@@ -405,18 +364,14 @@
     const history = getSceneHistory();
     
     const excluded = [...history, currentId].filter(Boolean);
-    console.log('🚫 Excluding from selection:', excluded);
-    
     const available = pool.filter(scene => !excluded.includes(scene.id));
     
     console.log('✅ Available scenes:', available.length, '/', pool.length);
-    console.log('📋 Available scene IDs:', available.map(s => s.id));
     
     if (available.length === 0) {
       console.warn('⚠️ No available scenes after exclusion - using fallback');
       const fallback = pool.filter(scene => scene.id !== currentId);
       if (fallback.length > 0) {
-        console.log('🎯 Fallback scene:', fallback[0].id);
         return fallback[0];
       }
       console.error('❌ No fallback available!');
@@ -426,24 +381,19 @@
     const totalWeight = available.reduce((sum, scene) => sum + scene.weight, 0);
     let random = Math.random() * totalWeight;
     
-    console.log('🎰 Weighted random selection:', random.toFixed(2), '/', totalWeight.toFixed(2));
-    
     for (const scene of available) {
       random -= scene.weight;
       if (random <= 0) {
-        console.log('🎯 Selected scene:', scene.id, `(weight: ${scene.weight})`);
-        console.log('📍 Navigating to:', scene.url);
+        console.log('🎯 Selected scene:', scene.id);
         return scene;
       }
     }
     
-    const fallback = available[0];
-    console.log('🎯 Fallback to first available:', fallback.id);
-    return fallback;
+    return available[0];
   }
 
   // ============================================================
-  // AUDIO MANAGEMENT
+  // AUDIO MANAGEMENT (Simplified)
   // ============================================================
   
   async function initAudio() {
@@ -474,45 +424,12 @@
       State.meditationAudio.loop = true;
     }
     
-    // Initialize breath-reactive audio system (AHBreathAudio)
-    if (State.breathAudio && window.AHBreathAudio) {
-      try {
-        await window.AHBreathAudio.init(State.breathAudio);
-        console.log('🌬️ Breath-reactive audio initialized');
-      } catch (e) {
-        console.warn('⚠️ Breath audio init failed:', e);
-      }
-    } else if (State.breathAudio) {
-      // Fallback: simple breath audio setup without reactive system
+    // Simple breath audio setup - no modulation needed
+    if (State.breathAudio) {
       State.breathAudio.volume = CONFIG.audioVolume;
       State.breathAudio.loop = true;
+      console.log('🌬️ Breath audio ready (natural recording)');
     }
-  }
-  
-  function playBreathSound() {
-    if (!State.breathAudio || !State.backgroundAudio) return;
-    
-    const audioEnabled = window.AHAudioState 
-      ? window.AHAudioState.getState().isPlaying 
-      : !State.backgroundAudio.paused;
-    
-    if (!audioEnabled) return;
-    
-    const originalVolume = State.backgroundAudio.volume;
-    gsap.to(State.backgroundAudio, {
-      volume: originalVolume * (1 - CONFIG.breathDuckAmount),
-      duration: 0.2,
-      onComplete: () => {
-        gsap.to(State.backgroundAudio, {
-          volume: originalVolume,
-          duration: 0.3,
-          delay: CONFIG.breathIn + CONFIG.breathPause + CONFIG.breathOut - 0.5
-        });
-      }
-    });
-    
-    State.breathAudio.currentTime = 0;
-    State.breathAudio.play().catch(e => console.warn('⚠️ Breath sound failed:', e));
   }
   
   async function crossfadeToMeditation() {
@@ -593,7 +510,6 @@
           State.canScroll = true;
           console.log('✅ Scene entry complete - content mode active');
           
-          // NEW: Start scene animations after entry completes
           console.log('🎬 Starting scene animations (breathing + facets)');
           startSceneAnimations();
           
@@ -601,7 +517,7 @@
         }
       });
       
-      // Metatron BREATHES OUT from tiny center (consistent with content blocks)
+      // Metatron BREATHES OUT from tiny center
       if (DOM.metatron) {
         tl.fromTo(DOM.metatron,
           {
@@ -742,9 +658,6 @@
       }
     });
     
-    // OLD: playBreathSound() - disabled, now using AHBreathAudio in meditation mode only
-    // tl.add(() => playBreathSound());
-    
     if (currentBlock) {
       tl.add(breatheIn(currentBlock), 0);
     }
@@ -825,14 +738,6 @@
       onComplete: () => {
         console.log('✅ Meditation mode active');
         enableCenterDivination();
-        
-        // Start breath-reactive audio if available and audio is enabled
-        if (window.AHBreathAudio?.getState()?.isInitialized) {
-          const audioState = window.AHAudioState?.getState();
-          if (audioState?.isPlaying) {
-            window.AHBreathAudio.start();
-          }
-        }
       }
     });
     
@@ -882,19 +787,12 @@
     }
     
     tl.add(() => crossfadeToMeditation(), '-=0.8');
-    
-    // Facets continue running from sceneBuilder - no need to start them again
   }
   
   function exitMeditationMode() {
     if (!State.inMeditation) return;
     
     console.log('📖 Exiting meditation mode');
-    
-    // Stop breath-reactive audio
-    if (window.AHBreathAudio?.getState()?.isPlaying) {
-      window.AHBreathAudio.stop();
-    }
     
     disableCenterDivination();
     
@@ -963,31 +861,21 @@
       return;
     }
     
-    console.log('🎯 Center divination enabled (click only, breathing continues)');
+    console.log('🎯 Center divination enabled');
     
-    // Only enable pointer events for clicking - don't override the breathing animation
     gsap.set(DOM.metatronCenter, {
       cursor: 'pointer',
       pointerEvents: 'auto'
     });
-    
-    // Note: We no longer animate opacity/scale here because the breathing 
-    // animation from sceneBuilder handles that. The center portal breathing
-    // (synced or reversed) provides the visual feedback in meditation mode.
   }
   
   function disableCenterDivination() {
     if (!DOM.metatronCenter) return;
     
-    // Only disable pointer events - don't kill the breathing animation
     gsap.set(DOM.metatronCenter, {
       pointerEvents: 'none',
       cursor: 'default'
     });
-    
-    // Note: We no longer kill tweens or set opacity to 0 here because
-    // the breathing animation should continue. The breathing will be
-    // stopped by stopSceneAnimations() when divination is triggered.
   }
   
   function triggerDivination() {
@@ -996,7 +884,6 @@
     playSfx(DOM.divinationSfx);
     disableCenterDivination();
     
-    // Stop all scene animations before navigation
     stopSceneAnimations();
     
     const nextScene = selectNextScene();
@@ -1134,11 +1021,9 @@
   function handleClick(e) {
     if (State.inMeditation || !State.canScroll || !State.sceneEntryComplete) return;
     
-    // Ignore clicks on UI elements
     if (DOM.audioToggle && DOM.audioToggle.contains(e.target)) return;
     if (DOM.goddess && DOM.goddess.contains(e.target)) return;
     
-    // Determine click zone
     const clickY = e.clientY;
     const windowHeight = window.innerHeight;
     const topZone = windowHeight * 0.5;
@@ -1193,7 +1078,6 @@
   async function handleAudioToggle(e) {
     e.stopPropagation();
     
-    // Determine which audio SHOULD be playing based on current mode
     const targetAudio = State.inMeditation && State.meditationAudio 
       ? State.meditationAudio 
       : State.backgroundAudio;
@@ -1203,7 +1087,6 @@
     console.log('🎵 Audio toggle clicked');
     
     if (window.AHAudioState) {
-      // Check current state before toggle
       const wasPlaying = window.AHAudioState.getState().isPlaying;
       
       await window.AHAudioState.toggle(targetAudio, DOM.audioIcon);
@@ -1214,8 +1097,6 @@
       if (State.inMeditation) {
         if (audioState.isPlaying && !wasPlaying) {
           // Audio just turned ON while in meditation
-          
-          // Start meditation audio if not playing
           if (State.meditationAudio && State.meditationAudio.paused) {
             State.meditationAudio.currentTime = 0;
             State.meditationAudio.volume = 0;
@@ -1223,16 +1104,8 @@
             gsap.to(State.meditationAudio, { volume: window.AHAudioState.VOLUME_LEVEL, duration: 0.5 });
             console.log('🎵 Meditation audio started');
           }
-          
-          // Start breath audio
-          if (window.AHBreathAudio?.getState()?.isInitialized) {
-            window.AHBreathAudio.start();
-            console.log('🌬️ Breath audio started (audio enabled in meditation)');
-          }
         } else if (!audioState.isPlaying && wasPlaying) {
           // Audio just turned OFF
-          
-          // Stop meditation audio
           if (State.meditationAudio && !State.meditationAudio.paused) {
             gsap.to(State.meditationAudio, { 
               volume: 0, 
@@ -1240,25 +1113,10 @@
               onComplete: () => State.meditationAudio.pause() 
             });
           }
-          
-          // Stop breath audio
-          if (window.AHBreathAudio?.getState()?.isPlaying) {
-            window.AHBreathAudio.stop();
-            console.log('🌬️ Breath audio stopped (audio disabled)');
-          }
-        }
-      }
-      
-      // Legacy breath sound handling (for non-reactive mode)
-      if (State.breathAudio && !window.AHBreathAudio) {
-        if (!audioState.isPlaying) {
-          State.breathAudio.pause();
-          State.breathAudio.volume = 0;
-        } else {
-          State.breathAudio.volume = CONFIG.audioVolume;
         }
       }
     } else {
+      // Fallback without AHAudioState
       const isPlaying = !targetAudio.paused;
       
       if (isPlaying) {
@@ -1276,10 +1134,6 @@
             onComplete: () => State.meditationAudio.pause()
           });
         }
-        if (State.breathAudio) {
-          State.breathAudio.pause();
-          State.breathAudio.volume = 0;
-        }
         if (DOM.audioIcon) {
           gsap.to(DOM.audioIcon, { opacity: 0.4, duration: 0.3 });
         }
@@ -1292,9 +1146,6 @@
             volume: CONFIG.audioVolume,
             duration: 0.3
           });
-          if (State.breathAudio) {
-            State.breathAudio.volume = CONFIG.audioVolume;
-          }
           if (DOM.audioIcon) {
             gsap.to(DOM.audioIcon, { opacity: 1, duration: 0.3 });
           }
@@ -1405,11 +1256,11 @@
   
   async function init() {
     try {
-      console.log('💖 Oracle Scene Controller v4.2 initializing...');
+      console.log('💖 Oracle Scene Controller v4.4.0 initializing...');
+      console.log('   Audio: Simplified (natural breath recording)');
       
       cacheDOM();
       
-      // NEW: Read scene config early
       State.sceneConfig = readSceneConfig();
       console.log('📋 Scene config ready:', State.sceneConfig.name);
       
