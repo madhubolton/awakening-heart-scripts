@@ -1,23 +1,54 @@
 /*--------------------------------------------------------------
   Awakening Heart : Scene Builder
-  Version: 1.4.2 | Date: 2025-01-18
+  Version: 1.3.4 | Date: 2025-01-17
   
   Unified animation system for Metatron facets and portals.
   
-  CHANGES in v1.4.2:
-  - Fixed: Breath sound only plays in MEDITATION mode (not philosophy/content)
-  - Fixed: Breath sound volume reduced (configurable via BREATH_SOUND_VOLUME)
+  CHANGES in v1.3.4:
+  - Facets now reset to transparent when finite repeat count ends
+  - Smooth 0.5s fade out on animation complete
   
-  CHANGES in v1.4.1:
-  - Fixed: Breath sound now plays ONCE at inhale start AND exhale start
-  - Fixed: Breath sound respects audio toggle state
-  - Removed loop from breath audio (plays as marker, not continuous)
+  CHANGES in v1.3.3:
+  - Added opacity config support for innerPortals
   
   CHANGES in v1.3.2:
   - Added try-catch error handling for center portal setup
   - Added try-catch around breathing animation startup
   - Better logging for center portal element detection
   - Prevents breathing errors from breaking facet animations
+  
+  CHANGES in v1.3.1:
+  - Integrated breath-reactive audio (AHBreathAudio)
+  - Audio gain + filter modulate in sync with breath
+  - Refactored createBreathingAnimation to use createBreathCycle
+  
+  CHANGES in v1.3.0:
+  - Added progressive breath sequencing (breathSequence config)
+  - Sequences allow staged descent: simple → coherent → resonance
+  - Each stage has configurable cycle count (-1 for infinite)
+  - Default preset changed to 'coherent' (5-5, easiest to drop into)
+  
+  CHANGES in v1.2.6:
+  - Added 'coherent' breath preset (5s in, 5s out) - easiest to drop into
+  
+  CHANGES in v1.2.5:
+  - Fixed breathing loop causing portals to flash/disappear
+  - Restructured to master timeline with intro fade-in + nested repeating breath
+  
+  CHANGES in v1.2.4:
+  - Added graceful fade-in for outer portals (no abrupt flash)
+  - Added graceful fade-in for center portal breathing
+  
+  CHANGES in v1.2.3:
+  - Center portal now on SAME timeline as outer portals for perfect sync
+  - Removed separate center breathing timeline
+  
+  CHANGES in v1.2.2:
+  - Fixed center portal scaleMax to 1.0 (was 1.1, broke geometry)
+  
+  CHANGES in v1.2.1:
+  - Fixed inner portals incorrectly getting breathing animation
+  - Fixed center portal breathing not working
 --------------------------------------------------------------*/
 
 (function() {
@@ -126,60 +157,21 @@
   }
 
   // ============================================================
-  // BREATH SOUND PLAYBACK (Triggers on inhale and exhale)
-  // Only plays in meditation mode
+  // BREATHING: CREATE SINGLE BREATH CYCLE (helper)
+  // Includes optional breath audio modulation
   // ============================================================
   
-  const BREATH_SOUND_VOLUME = 0.015;  // Adjust this value (0.0 to 1.0)
-  
-  function playBreathSound() {
-    const breathSound = document.getElementById('breathSound');
-    if (!breathSound) return;
-    
-    // Only play in meditation mode
-    const inMeditation = window.AHSceneController?.getState()?.inMeditation;
-    if (!inMeditation) return;
-    
-    // Check if audio is enabled via AHAudioState or fallback to meditation/background audio
-    let audioEnabled = false;
-    
-    if (window.AHAudioState) {
-      audioEnabled = window.AHAudioState.getState().isPlaying;
-    } else {
-      // Fallback: check if any main audio is playing
-      const bgMusic = document.getElementById('bgMusic');
-      const medMusic = document.getElementById('meditationMusic');
-      audioEnabled = (bgMusic && !bgMusic.paused) || (medMusic && !medMusic.paused);
-    }
-    
-    if (!audioEnabled) return;
-    
-    // Play once (not looped) - reset and play at reduced volume
-    breathSound.currentTime = 0;
-    breathSound.volume = BREATH_SOUND_VOLUME;
-    breathSound.loop = false;
-    breathSound.play().catch(e => console.warn('🌬️ Breath sound play failed:', e));
-  }
-
-  // ============================================================
-  // BREATHING: CREATE SINGLE BREATH CYCLE
-  // Simplified: visual animation + sound trigger only
-  // ============================================================
-  
-  function createBreathCycle(preset, outerShapes, OUTER_BREATH, centerShapes, CENTER_BREATH, centerMode, repeatCount = -1) {
+  function createBreathCycle(preset, outerShapes, OUTER_BREATH, centerShapes, CENTER_BREATH, centerMode, repeatCount = -1, includeAudio = true) {
     const timing = BREATH_PRESETS[preset] || BREATH_PRESETS.coherent;
     const cycle = timing.inhale + timing.holdIn + timing.exhale + timing.holdOut;
     
     const breathTl = gsap.timeline({ repeat: repeatCount });
     let pos = 0;
+    
+    // Check if breath audio is available
+    const hasBreathAudio = includeAudio && window.AHBreathAudio?.params && window.AHBreathAudio?.getState()?.isInitialized;
 
-    // Trigger breath sound at INHALE start
-    breathTl.call(() => {
-      console.log('🌬️ Inhale');
-      playBreathSound();
-    }, [], pos);
-
-    // INHALE: Contract + Dim
+    // INHALE: Contract + Dim (+ audio: quieter, darker)
     breathTl.to(outerShapes, {
       scale: OUTER_BREATH.scaleMin,
       opacity: OUTER_BREATH.opacityMin,
@@ -203,6 +195,17 @@
           ease: "sine.inOut"
         }, pos);
       }
+    }
+    
+    // Audio: Inhale - quieter, filter closes
+    if (hasBreathAudio) {
+      const inhaleParams = window.AHBreathAudio.getInhaleParams();
+      breathTl.to(window.AHBreathAudio.params, {
+        gain: inhaleParams.gain,
+        filterFreq: inhaleParams.filterFreq,
+        duration: timing.inhale,
+        ease: "sine.inOut"
+      }, pos);
     }
     
     pos += timing.inhale;
@@ -252,16 +255,31 @@
         }
       }
       
+      // Audio: Hold-in micro-motion
+      if (hasBreathAudio) {
+        const inhaleParams = window.AHBreathAudio.getInhaleParams();
+        const holdVar = { 
+          gain: inhaleParams.gain * 1.08, 
+          filterFreq: inhaleParams.filterFreq * 1.08 
+        };
+        breathTl.to(window.AHBreathAudio.params, {
+          gain: holdVar.gain,
+          filterFreq: holdVar.filterFreq,
+          duration: timing.holdIn / 2,
+          ease: "sine.inOut"
+        }, pos);
+        breathTl.to(window.AHBreathAudio.params, {
+          gain: inhaleParams.gain,
+          filterFreq: inhaleParams.filterFreq,
+          duration: timing.holdIn / 2,
+          ease: "sine.inOut"
+        }, pos + timing.holdIn / 2);
+      }
+      
       pos += timing.holdIn;
     }
 
-    // Trigger breath sound at EXHALE start
-    breathTl.call(() => {
-      console.log('🌬️ Exhale');
-      playBreathSound();
-    }, [], pos);
-
-    // EXHALE: Expand + Brighten
+    // EXHALE: Expand + Brighten (+ audio: louder, brighter)
     breathTl.to(outerShapes, {
       scale: OUTER_BREATH.scaleMax,
       opacity: OUTER_BREATH.opacityMax,
@@ -285,6 +303,17 @@
           ease: "sine.inOut"
         }, pos);
       }
+    }
+    
+    // Audio: Exhale - louder, filter opens
+    if (hasBreathAudio) {
+      const exhaleParams = window.AHBreathAudio.getExhaleParams();
+      breathTl.to(window.AHBreathAudio.params, {
+        gain: exhaleParams.gain,
+        filterFreq: exhaleParams.filterFreq,
+        duration: timing.exhale,
+        ease: "sine.inOut"
+      }, pos);
     }
     
     pos += timing.exhale;
@@ -332,6 +361,27 @@
             ease: "sine.inOut"
           }, pos + timing.holdOut / 2);
         }
+      }
+      
+      // Audio: Hold-out micro-motion
+      if (hasBreathAudio) {
+        const exhaleParams = window.AHBreathAudio.getExhaleParams();
+        const holdVar = { 
+          gain: exhaleParams.gain * 0.95, 
+          filterFreq: exhaleParams.filterFreq * 0.95 
+        };
+        breathTl.to(window.AHBreathAudio.params, {
+          gain: holdVar.gain,
+          filterFreq: holdVar.filterFreq,
+          duration: timing.holdOut / 2,
+          ease: "sine.inOut"
+        }, pos);
+        breathTl.to(window.AHBreathAudio.params, {
+          gain: exhaleParams.gain,
+          filterFreq: exhaleParams.filterFreq,
+          duration: timing.holdOut / 2,
+          ease: "sine.inOut"
+        }, pos + timing.holdOut / 2);
       }
     }
 
@@ -484,6 +534,7 @@
     sequence.forEach((stage, index) => {
       const preset = stage.preset;
       const cycles = stage.cycles;
+      const isLast = index === sequence.length - 1;
       
       // For the last stage with -1 cycles, repeat infinitely
       // For other stages, repeat (cycles - 1) times (since first play counts as 1)
@@ -516,7 +567,7 @@
   }
 
   // ============================================================
-  // BREATHING ANIMATION (Single preset)
+  // BREATHING ANIMATION (Single preset - wrapper for backward compatibility)
   // ============================================================
   
   function createBreathingAnimation(preset, outerConfig = {}, centerConfig = null) {
@@ -546,6 +597,7 @@
     console.log(`   Pattern: ${timing.inhale}s in → ${timing.holdIn}s hold → ${timing.exhale}s out → ${timing.holdOut}s hold`);
     console.log(`   Cycle: ${cycle}s`);
     console.log(`   Outer portals: ${outerFills.length} fills, ${outerStrokes.length} strokes`);
+    console.log(`   Outer fill: ${outerFill} | Opacity: ${OUTER_BREATH.opacityMin} → ${OUTER_BREATH.opacityMax}`);
 
     if (outerFills.length === 0) {
       console.warn("⚠️ No outer portal fill elements found");
@@ -605,14 +657,14 @@
         gsap.set(centerFillEl, {
           fill: centerFill,
           scale: targetScale,
-          opacity: 0,
+          opacity: 0,  // Start invisible
           transformOrigin: "center center"
         });
         
         if (centerStrokeEl) {
           gsap.set(centerStrokeEl, {
             scale: targetScale,
-            opacity: 0,
+            opacity: 0,  // Start invisible
             transformOrigin: "center center"
           });
         }
@@ -625,6 +677,7 @@
         });
         
         console.log(`🎯 Center portal: ${centerMode} mode`);
+        console.log(`   Fill: ${centerFill} | Opacity: ${CENTER_BREATH.opacityMin} → ${CENTER_BREATH.opacityMax}`);
       }
     } else if (centerConfig && centerConfig.mode === "static") {
       // Static center - just set fill/opacity, no animation
@@ -646,6 +699,8 @@
     }
 
     // Create breathing animation with intro fade-in + repeating breath cycle
+    // Use a master timeline with a nested repeating timeline for the breath cycle
+    
     const masterTl = gsap.timeline();
     
     // ============================================================
@@ -674,6 +729,7 @@
     
     // ============================================================
     // BREATH CYCLE (repeats infinitely after intro)
+    // Uses createBreathCycle which includes audio modulation
     // ============================================================
     
     const { timeline: breathTl } = createBreathCycle(
@@ -683,11 +739,12 @@
       centerShapes, 
       CENTER_BREATH, 
       centerMode, 
-      -1  // repeat infinitely
+      -1,  // repeat infinitely
+      true // include audio
     );
 
     // Add the repeating breath cycle to master timeline after intro
-    masterTl.add(breathTl, 1.5);
+    masterTl.add(breathTl, 1.5);  // Start breath cycle after fade-in completes
 
     console.log(`✅ Breathing timeline created (intro fade-in + repeating cycle)`);
     return masterTl;
@@ -710,6 +767,7 @@
     const innerFills = getShapes(INNER_PORTAL_FILL_IDS);
     
     console.log(`✨ Inner Portals: ${innerFills.length} fills (fill animation only)`);
+    console.log(`   Fill: ${fill}, opacity: ${opacity}, duration: ${duration}s, stagger: ${stagger}s, delay: ${delay}s`);
     
     if (innerFills.length === 0) {
       console.warn("⚠️ No inner portal elements found");
@@ -754,6 +812,7 @@
     const shapes = getShapes(ids);
 
     console.log(`   ${groupName}: ${shapes.length}/${ids.length} facets`);
+    console.log(`      fill: ${fill}, duration: ${duration}s, stagger: ${stagger}s, delay: ${delay}s`);
 
     if (shapes.length === 0) return [];
 
@@ -763,14 +822,27 @@
 
     const tweens = [];
     shapes.forEach((shape, i) => {
-      const tween = gsap.to(shape, {
+      const isLastShape = i === shapes.length - 1;
+      const tweenConfig = {
         fill: fill,
         duration: duration,
         repeat: repeat,
         yoyo: yoyo,
         ease: ease,
         delay: delay + (i * stagger)
-      });
+      };
+      
+      // Reset to transparent when finite animation completes
+      if (repeat !== -1) {
+        tweenConfig.onComplete = () => {
+          gsap.to(shape, { fill: "transparent", duration: 0.5, ease: "sine.out" });
+        };
+        if (isLastShape) {
+          console.log(`      ${groupName}: Will reset after ${repeat + 1} cycles`);
+        }
+      }
+      
+      const tween = gsap.to(shape, tweenConfig);
       tweens.push(tween);
     });
 
@@ -961,9 +1033,9 @@
     CENTER_PORTAL_FILL_ID
   };
 
-  console.log("🎬 Scene Builder v1.4.2 loaded");
-  console.log("   Breath audio: Plays on inhale/exhale (meditation mode only)");
+  console.log("🎬 Scene Builder v1.3.4 loaded");
   console.log("   Supports: breathPreset (single) or breathSequence (progressive)");
+  console.log("   Audio: Auto-integrates with AHBreathAudio if initialized");
   console.log("═══════════════════════════════════════════════════════");
 
 })();
