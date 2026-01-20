@@ -1,8 +1,14 @@
 /*--------------------------------------------------------------
   Awakening Heart : Scene Builder
-  Version: 1.3.4 | Date: 2025-01-17
+  Version: 1.4.0 | Date: 2025-01-19
   
   Unified animation system for Metatron facets and portals.
+  
+  CHANGES in v1.4.0:
+  - Added Triple Goddess configuration support
+  - Independent config for each goddess element (crescents, fullMoon, bindu)
+  - Goddess elements can animate like facets (pulse, yoyo, repeat)
+  - Bindu breath sync: bindu pulses in sync with breath cycle
   
   CHANGES in v1.3.4:
   - Facets now reset to transparent when finite repeat count ends
@@ -91,6 +97,18 @@
   const INNER_PORTAL_STROKE_IDS = ["P_IT_S", "P_IRT_S", "P_IRB_S", "P_IB_S", "P_ILB_S", "P_ILT_S"];
   const CENTER_PORTAL_FILL_ID = "P_C";
   const CENTER_PORTAL_STROKE_ID = "P_C_S";
+
+  // ============================================================
+  // GODDESS IDS
+  // ============================================================
+  
+  const GODDESS_IDS = {
+    crescentLeft: "crescent-left",
+    crescentRight: "crescent-right",
+    crescentTop: "crescent-top",
+    fullMoon: "full-circle",
+    bindu: "bindu"
+  };
 
   // ============================================================
   // HELPER: Get element by ID
@@ -208,6 +226,17 @@
       }, pos);
     }
     
+    // Bindu: Inhale - expand and brighten (gathering energy)
+    const binduConfig = window._binduBreathConfig;
+    if (binduConfig && binduConfig.element) {
+      breathTl.to(binduConfig.element, {
+        scale: binduConfig.scaleMax,
+        opacity: binduConfig.opacity,
+        duration: timing.inhale,
+        ease: "sine.inOut"
+      }, pos);
+    }
+    
     pos += timing.inhale;
 
     // HOLD-IN
@@ -276,6 +305,21 @@
         }, pos + timing.holdIn / 2);
       }
       
+      // Bindu: Hold-in micro-motion
+      if (binduConfig && binduConfig.element) {
+        const holdScale = 0.05;
+        breathTl.to(binduConfig.element, {
+          scale: binduConfig.scaleMax - holdScale,
+          duration: timing.holdIn / 2,
+          ease: "sine.inOut"
+        }, pos);
+        breathTl.to(binduConfig.element, {
+          scale: binduConfig.scaleMax,
+          duration: timing.holdIn / 2,
+          ease: "sine.inOut"
+        }, pos + timing.holdIn / 2);
+      }
+      
       pos += timing.holdIn;
     }
 
@@ -311,6 +355,16 @@
       breathTl.to(window.AHBreathAudio.params, {
         gain: exhaleParams.gain,
         filterFreq: exhaleParams.filterFreq,
+        duration: timing.exhale,
+        ease: "sine.inOut"
+      }, pos);
+    }
+    
+    // Bindu: Exhale - contract and dim (releasing energy)
+    if (binduConfig && binduConfig.element) {
+      breathTl.to(binduConfig.element, {
+        scale: binduConfig.scaleMin,
+        opacity: binduConfig.opacityMin,
         duration: timing.exhale,
         ease: "sine.inOut"
       }, pos);
@@ -379,6 +433,21 @@
         breathTl.to(window.AHBreathAudio.params, {
           gain: exhaleParams.gain,
           filterFreq: exhaleParams.filterFreq,
+          duration: timing.holdOut / 2,
+          ease: "sine.inOut"
+        }, pos + timing.holdOut / 2);
+      }
+      
+      // Bindu: Hold-out micro-motion
+      if (binduConfig && binduConfig.element) {
+        const holdScale = 0.05;
+        breathTl.to(binduConfig.element, {
+          scale: binduConfig.scaleMin + holdScale,
+          duration: timing.holdOut / 2,
+          ease: "sine.inOut"
+        }, pos);
+        breathTl.to(binduConfig.element, {
+          scale: binduConfig.scaleMin,
           duration: timing.holdOut / 2,
           ease: "sine.inOut"
         }, pos + timing.holdOut / 2);
@@ -850,11 +919,227 @@
   }
 
   // ============================================================
+  // GODDESS: ELEMENT CONFIGURATION
+  // ============================================================
+  
+  function configureGoddessElement(elementId, config = {}) {
+    const shape = getShape(elementId);
+    if (!shape) {
+      console.warn(`⚠️ Goddess element not found: ${elementId}`);
+      return null;
+    }
+    
+    const fill = config.fill;
+    const opacity = config.opacity ?? 1.0;
+    
+    // Set initial state
+    if (fill) {
+      gsap.set(shape, { fill: fill });
+    }
+    gsap.set(shape, { opacity: opacity });
+    
+    return shape;
+  }
+  
+  // ============================================================
+  // GODDESS: ANIMATED ELEMENT (like facets)
+  // ============================================================
+  
+  function animateGoddessElement(elementId, config = {}, elementName = "") {
+    const shape = getShape(elementId);
+    if (!shape) {
+      console.warn(`⚠️ Goddess element not found: ${elementId}`);
+      return null;
+    }
+    
+    const fill = config.fill;
+    const fillTo = config.fillTo || fill;  // Can animate between two colors
+    const opacity = config.opacity ?? 1.0;
+    const opacityTo = config.opacityTo ?? opacity;  // Can animate opacity too
+    const duration = config.duration ?? 2.0;
+    const delay = config.delay ?? 0;
+    const repeat = config.repeat ?? -1;
+    const yoyo = config.yoyo ?? true;
+    const ease = config.ease || "sine.inOut";
+    const animate = config.animate ?? false;
+    
+    // Set initial state
+    gsap.set(shape, { 
+      fill: fill || gsap.getProperty(shape, "fill"),
+      opacity: opacity 
+    });
+    
+    console.log(`   🌙 ${elementName}: fill ${fill}, opacity ${opacity}${animate ? `, animate: ${duration}s` : ''}`);
+    
+    // If not animating, just return (static configuration)
+    if (!animate) {
+      return null;
+    }
+    
+    // Create animation
+    const tweenConfig = {
+      duration: duration,
+      delay: delay,
+      repeat: repeat,
+      yoyo: yoyo,
+      ease: ease
+    };
+    
+    // Animate fill if fillTo is different
+    if (fillTo && fillTo !== fill) {
+      tweenConfig.fill = fillTo;
+    }
+    
+    // Animate opacity if opacityTo is different
+    if (opacityTo !== opacity) {
+      tweenConfig.opacity = opacityTo;
+    }
+    
+    // Only create tween if there's something to animate
+    if (tweenConfig.fill || tweenConfig.opacity !== undefined) {
+      // Reset to initial state when finite animation completes
+      if (repeat !== -1) {
+        tweenConfig.onComplete = () => {
+          gsap.to(shape, { 
+            fill: fill, 
+            opacity: opacity, 
+            duration: 0.5, 
+            ease: "sine.out" 
+          });
+        };
+      }
+      return gsap.to(shape, tweenConfig);
+    }
+    
+    return null;
+  }
+  
+  // ============================================================
+  // GODDESS: BINDU BREATH SYNC
+  // ============================================================
+  
+  let binduBreathTween = null;
+  
+  function startBinduBreathSync(config = {}) {
+    const bindu = getShape(GODDESS_IDS.bindu);
+    if (!bindu) {
+      console.warn("⚠️ Bindu element not found for breath sync");
+      return null;
+    }
+    
+    const fill = config.fill || "#ffffff";
+    const opacity = config.opacity ?? 1.0;
+    const opacityMin = config.opacityMin ?? 0.3;
+    const scaleMin = config.scaleMin ?? 0.8;
+    const scaleMax = config.scaleMax ?? 1.2;
+    
+    // Set initial state
+    gsap.set(bindu, { 
+      fill: fill, 
+      opacity: opacity,
+      transformOrigin: "center center"
+    });
+    
+    console.log(`   ✨ Bindu breath sync: opacity ${opacityMin}→${opacity}, scale ${scaleMin}→${scaleMax}`);
+    
+    // Store config for breath cycle integration
+    window._binduBreathConfig = {
+      element: bindu,
+      fill: fill,
+      opacity: opacity,
+      opacityMin: opacityMin,
+      scaleMin: scaleMin,
+      scaleMax: scaleMax
+    };
+    
+    return bindu;
+  }
+  
+  function stopBinduBreathSync() {
+    if (binduBreathTween) {
+      binduBreathTween.kill();
+      binduBreathTween = null;
+    }
+    window._binduBreathConfig = null;
+  }
+  
+  // ============================================================
+  // GODDESS: FULL CONFIGURATION
+  // ============================================================
+  
+  function configureGoddess(goddessConfig = {}) {
+    if (!goddessConfig || Object.keys(goddessConfig).length === 0) {
+      return [];
+    }
+    
+    console.log("🌙 Configuring Triple Goddess:");
+    
+    const tweens = [];
+    
+    // Crescent Left
+    if (goddessConfig.crescentLeft) {
+      const tween = animateGoddessElement(
+        GODDESS_IDS.crescentLeft, 
+        goddessConfig.crescentLeft, 
+        "Crescent Left"
+      );
+      if (tween) tweens.push(tween);
+    }
+    
+    // Crescent Right
+    if (goddessConfig.crescentRight) {
+      const tween = animateGoddessElement(
+        GODDESS_IDS.crescentRight, 
+        goddessConfig.crescentRight, 
+        "Crescent Right"
+      );
+      if (tween) tweens.push(tween);
+    }
+    
+    // Crescent Top
+    if (goddessConfig.crescentTop) {
+      const tween = animateGoddessElement(
+        GODDESS_IDS.crescentTop, 
+        goddessConfig.crescentTop, 
+        "Crescent Top"
+      );
+      if (tween) tweens.push(tween);
+    }
+    
+    // Full Moon
+    if (goddessConfig.fullMoon) {
+      const tween = animateGoddessElement(
+        GODDESS_IDS.fullMoon, 
+        goddessConfig.fullMoon, 
+        "Full Moon"
+      );
+      if (tween) tweens.push(tween);
+    }
+    
+    // Bindu - special handling for breath sync
+    if (goddessConfig.bindu) {
+      if (goddessConfig.bindu.breathSync) {
+        startBinduBreathSync(goddessConfig.bindu);
+      } else {
+        const tween = animateGoddessElement(
+          GODDESS_IDS.bindu, 
+          goddessConfig.bindu, 
+          "Bindu"
+        );
+        if (tween) tweens.push(tween);
+      }
+    }
+    
+    return tweens;
+  }
+
+  // ============================================================
   // SCENE BUILDER (Main Function)
   // ============================================================
   
   function sceneBuilder(config) {
     stopAllAnimations();
+    stopBinduBreathSync();  // Clear any previous bindu breath sync
     window._sceneTimelines = [];
     
     const sceneName = config.name || "Custom Scene";
@@ -864,6 +1149,7 @@
     const innerPortalsConfig = config.innerPortals || null;
     const centerPortalConfig = config.centerPortal || null;
     const facetGroups = config.facetGroups || [];
+    const goddessConfig = config.goddess || null;
     const breathDelay = config.breathDelay ?? 0;
     const autoStartBreathing = config.autoStartBreathing ?? true;
 
@@ -886,6 +1172,12 @@
     if (innerPortalsConfig) {
       const innerTweens = animateInnerPortals(innerPortalsConfig);
       allTweens.push(...innerTweens);
+    }
+    
+    // Configure goddess elements
+    if (goddessConfig) {
+      const goddessTweens = configureGoddess(goddessConfig);
+      allTweens.push(...goddessTweens);
     }
 
     // Breathing (supports single preset OR progressive sequence)
@@ -1033,9 +1325,10 @@
     CENTER_PORTAL_FILL_ID
   };
 
-  console.log("🎬 Scene Builder v1.3.4 loaded");
+  console.log("🎬 Scene Builder v1.4.0 loaded");
   console.log("   Supports: breathPreset (single) or breathSequence (progressive)");
   console.log("   Audio: Auto-integrates with AHBreathAudio if initialized");
+  console.log("   Goddess: Configure crescents, fullMoon, bindu with breathSync");
   console.log("═══════════════════════════════════════════════════════");
 
 })();
