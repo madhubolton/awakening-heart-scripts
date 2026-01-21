@@ -1,6 +1,10 @@
 /*--------------------------------------------------------------
   Awakening Heart : Oracle Scene Controller
-  Version: 4.4.2 | Date: 2025-01-21
+  Version: 4.4.3 | Date: 2025-01-21
+  
+  CHANGES in v4.4.3:
+  - Fixed: FOUC prevention CSS now removed once GSAP takes control
+  - Text properly animates in after being hidden during initial load
   
   CHANGES in v4.4.2:
   - Fixed: FOUC (Flash of Unstyled Content) - text no longer flashes on load
@@ -1197,14 +1201,19 @@
   function setupInitialState() {
     console.log('🎬 Setting up initial scene state');
     
-    // Hide all content blocks (reinforces CSS hiding)
+    // Hide all content blocks via GSAP
     State.contentBlocks.forEach((block) => {
       if (block) {
-        block.style.visibility = 'hidden';
-        block.style.opacity = '0';
         gsap.set(block, { autoAlpha: 0, scale: 0 });
       }
     });
+    
+    // Now remove FOUC prevention CSS so GSAP can animate properly
+    const foucStyle = document.getElementById('ah-fouc-prevention');
+    if (foucStyle) {
+      foucStyle.remove();
+      console.log('🎭 FOUC prevention styles removed - GSAP in control');
+    }
     
     // Goddess at dock
     if (DOM.goddess) {
@@ -1290,7 +1299,7 @@
   
   async function init() {
     try {
-      console.log('💖 Oracle Scene Controller v4.4.2 initializing...');
+      console.log('💖 Oracle Scene Controller v4.4.3 initializing...');
       console.log('   FOUC prevention: CSS injected');
       console.log('   Audio: Breath plays on inhale/exhale markers');
       
