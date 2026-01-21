@@ -1,6 +1,10 @@
 /*--------------------------------------------------------------
   Awakening Heart : Oracle Scene Controller
-  Version: 4.4.3 | Date: 2025-01-21
+  Version: 4.4.4 | Date: 2025-01-21
+  
+  CHANGES in v4.4.4:
+  - Fixed: FOUC CSS now removed at exact moment content animates in
+  - Prevents any gap between CSS removal and GSAP animation
   
   CHANGES in v4.4.3:
   - Fixed: FOUC prevention CSS now removed once GSAP takes control
@@ -606,7 +610,15 @@
             autoAlpha: 1,
             scale: 1,
             duration: CONFIG.breathOut,
-            ease: 'power2.out'
+            ease: 'power2.out',
+            onStart: () => {
+              // Remove FOUC CSS right as content starts animating
+              const foucStyle = document.getElementById('ah-fouc-prevention');
+              if (foucStyle) {
+                foucStyle.remove();
+                console.log('🎭 FOUC prevention removed - animating in');
+              }
+            }
           },
           '-=0.4'
         );
@@ -622,16 +634,29 @@
             scale: 1,
             duration: CONFIG.breathOut,
             ease: 'power2.out',
-            transformOrigin: '50% 50%'
+            transformOrigin: '50% 50%',
+            onStart: () => {
+              // Backup: remove FOUC CSS if title didn't exist
+              const foucStyle = document.getElementById('ah-fouc-prevention');
+              if (foucStyle) {
+                foucStyle.remove();
+                console.log('🎭 FOUC prevention removed - content animating');
+              }
+            }
           },
           '-=0.2'
         );
       } else {
         console.log('ℹ️ No content blocks to animate');
+        // Still remove FOUC CSS
+        const foucStyle = document.getElementById('ah-fouc-prevention');
+        if (foucStyle) foucStyle.remove();
       }
       
       if (tl.totalDuration() === 0) {
         console.warn('⚠️ Scene entry timeline is empty, resolving immediately');
+        const foucStyle = document.getElementById('ah-fouc-prevention');
+        if (foucStyle) foucStyle.remove();
         State.sceneEntryComplete = true;
         State.canScroll = true;
         startSceneAnimations();
@@ -1201,19 +1226,14 @@
   function setupInitialState() {
     console.log('🎬 Setting up initial scene state');
     
-    // Hide all content blocks via GSAP
+    // Hide all content blocks via GSAP (FOUC CSS still active as backup)
     State.contentBlocks.forEach((block) => {
       if (block) {
         gsap.set(block, { autoAlpha: 0, scale: 0 });
       }
     });
     
-    // Now remove FOUC prevention CSS so GSAP can animate properly
-    const foucStyle = document.getElementById('ah-fouc-prevention');
-    if (foucStyle) {
-      foucStyle.remove();
-      console.log('🎭 FOUC prevention styles removed - GSAP in control');
-    }
+    // NOTE: FOUC CSS removed later in playSceneEntryAnimation when content animates
     
     // Goddess at dock
     if (DOM.goddess) {
@@ -1299,7 +1319,7 @@
   
   async function init() {
     try {
-      console.log('💖 Oracle Scene Controller v4.4.3 initializing...');
+      console.log('💖 Oracle Scene Controller v4.4.4 initializing...');
       console.log('   FOUC prevention: CSS injected');
       console.log('   Audio: Breath plays on inhale/exhale markers');
       
