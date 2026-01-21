@@ -1,6 +1,10 @@
 /*--------------------------------------------------------------
   Awakening Heart : Oracle Scene Controller
-  Version: 4.4.1 | Date: 2025-01-18
+  Version: 4.4.2 | Date: 2025-01-21
+  
+  CHANGES in v4.4.2:
+  - Fixed: FOUC (Flash of Unstyled Content) - text no longer flashes on load
+  - Injects hiding CSS immediately before DOMContentLoaded
   
   CHANGES in v4.4.1:
   - Fixed: Breath audio no longer loops (plays once per trigger)
@@ -20,6 +24,36 @@
 
 (function() {
   'use strict';
+
+  // ============================================================
+  // FOUC PREVENTION: Inject CSS immediately to hide content
+  // This runs BEFORE DOMContentLoaded to prevent text flash
+  // ============================================================
+  
+  (function injectHidingStyles() {
+    const style = document.createElement('style');
+    style.id = 'ah-fouc-prevention';
+    style.textContent = `
+      #intro-text, #distinction-text, #quote-text, #share-text, #practice-text,
+      #prompt0, #prompt1, #prompt2, #prompt3, #prompt4 {
+        visibility: hidden !important;
+        opacity: 0 !important;
+      }
+      #ah-title {
+        visibility: hidden !important;
+        opacity: 0 !important;
+      }
+    `;
+    // Insert as early as possible
+    if (document.head) {
+      document.head.insertBefore(style, document.head.firstChild);
+    } else {
+      document.addEventListener('DOMContentLoaded', () => {
+        document.head.insertBefore(style, document.head.firstChild);
+      }, { once: true });
+    }
+    console.log('🎭 FOUC prevention styles injected');
+  })();
 
   // ============================================================
   // CONFIGURATION (with responsive scaling)
@@ -1163,7 +1197,7 @@
   function setupInitialState() {
     console.log('🎬 Setting up initial scene state');
     
-    // Hide all content blocks
+    // Hide all content blocks (reinforces CSS hiding)
     State.contentBlocks.forEach((block) => {
       if (block) {
         block.style.visibility = 'hidden';
@@ -1256,7 +1290,8 @@
   
   async function init() {
     try {
-      console.log('💖 Oracle Scene Controller v4.4.1 initializing...');
+      console.log('💖 Oracle Scene Controller v4.4.2 initializing...');
+      console.log('   FOUC prevention: CSS injected');
       console.log('   Audio: Breath plays on inhale/exhale markers');
       
       cacheDOM();
