@@ -1,6 +1,12 @@
 /*--------------------------------------------------------------
   Awakening Heart : Oracle Scene Controller
-  Version: 4.4.4 | Date: 2025-01-21
+  Version: 4.5.0 | Date: 2025-02-04
+  
+  CHANGES in v4.5.0:
+  - Added: Course context support via URL parameters
+  - Divination now respects ?course= and ?arc= parameters
+  - Course scenes filtered from course-pool-item elements
+  - Context preserved across divination navigation
   
   CHANGES in v4.4.4:
   - Fixed: FOUC CSS now removed at exact moment content animates in
@@ -346,7 +352,52 @@
   // SCENE POOL & RANDOMIZATION
   // ============================================================
   
+  function getCourseContext() {
+    const params = new URLSearchParams(window.location.search);
+    const course = params.get('course');
+    const arc = params.get('arc');
+    
+    if (course && arc) {
+      console.log(`📚 Course context detected: ${course}, ${arc}`);
+      return { course, arc };
+    }
+    return null;
+  }
+  
   function loadScenePool() {
+    const courseContext = getCourseContext();
+    
+    if (courseContext) {
+      // Load from course pool, filtered by course and arc
+      const items = document.querySelectorAll('.course-pool-item');
+      const pool = Array.from(items)
+        .filter(item => 
+          item.dataset.course === courseContext.course && 
+          item.dataset.arc === courseContext.arc
+        )
+        .map(item => {
+          let url = item.dataset.sceneUrl || '';
+          if (url && !url.startsWith('/')) {
+            url = '/scenes/' + url;
+          }
+          // Preserve course context in URL for next divination
+          url += `?course=${courseContext.course}&arc=${courseContext.arc}`;
+          
+          return {
+            id: item.dataset.sceneId,
+            url: url,
+            weight: parseFloat(item.dataset.sceneWeight) || 1.0,
+            realm: item.dataset.realm
+          };
+        });
+      
+      const validPool = pool.filter(s => s.url && s.id);
+      console.log(`🎲 Course pool loaded: ${validPool.length} scenes for ${courseContext.course} / ${courseContext.arc}`);
+      
+      return validPool;
+    }
+    
+    // Original logic: load from oracle pool
     const items = document.querySelectorAll('.scene-pool-item');
     const pool = Array.from(items).map(item => {
       let url = item.dataset.sceneUrl || '';
@@ -1319,9 +1370,10 @@
   
   async function init() {
     try {
-      console.log('💖 Oracle Scene Controller v4.4.4 initializing...');
+      console.log('💖 Oracle Scene Controller v4.5.0 initializing...');
       console.log('   FOUC prevention: CSS injected');
       console.log('   Audio: Breath plays on inhale/exhale markers');
+      console.log('   Course context: URL parameter support enabled');
       
       cacheDOM();
       
@@ -1383,6 +1435,7 @@
     exitMeditationMode,
     startSceneAnimations,
     stopSceneAnimations,
+    getCourseContext,
     getState: () => State,
     getDOM: () => DOM,
     getSceneConfig: () => State.sceneConfig
