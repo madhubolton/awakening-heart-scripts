@@ -1,6 +1,11 @@
 /*--------------------------------------------------------------
   Awakening Heart : Oracle Scene Controller
-  Version: 4.5.0 | Date: 2025-02-04
+  Version: 4.5.1 | Date: 2025-02-28
+  
+  CHANGES in v4.5.1:
+  - Fixed: Goddess click during content transition no longer freezes text
+  - handleGoddessClick now checks State.isTransitioning before proceeding
+  - enterMeditationMode now kills any in-flight content block tweens as safety net
   
   CHANGES in v4.5.0:
   - Added: Course context support via URL parameters
@@ -834,6 +839,14 @@
   function enterMeditationMode() {
     if (State.inMeditation || !State.sceneEntryComplete) return;
     
+    // ✅ FIX v4.5.1: Kill any in-flight content block tweens before entering
+    // meditation, preventing text from freezing mid-animation if the goddess
+    // was clicked during a breatheIn / breatheOut transition.
+    State.contentBlocks.forEach(block => {
+      if (block) gsap.killTweensOf(block);
+    });
+    State.isTransitioning = false;
+    
     console.log('🧘 Entering meditation mode');
     
     State.lastContentBlockBeforeMeditation = State.currentBlockIndex;
@@ -1156,6 +1169,14 @@
     
     if (!State.sceneEntryComplete) return;
     
+    // ✅ FIX v4.5.1: Block goddess click while a content block transition is
+    // animating. Without this guard the breatheIn / breatheOut tween on the
+    // current block gets abandoned mid-flight, leaving text frozen on screen.
+    if (State.isTransitioning) {
+      console.log('⏳ Goddess click blocked - content transition in progress');
+      return;
+    }
+    
     console.log('🌙 Goddess clicked');
     playSfx(DOM.goddessClickSfx);
     
@@ -1370,10 +1391,11 @@
   
   async function init() {
     try {
-      console.log('💖 Oracle Scene Controller v4.5.0 initializing...');
+      console.log('💖 Oracle Scene Controller v4.5.1 initializing...');
       console.log('   FOUC prevention: CSS injected');
       console.log('   Audio: Breath plays on inhale/exhale markers');
       console.log('   Course context: URL parameter support enabled');
+      console.log('   Fix: Goddess click blocked during content transitions');
       
       cacheDOM();
       
