@@ -9,8 +9,8 @@
     containing the Facets / Paths / Portals SVG embeds) on the page.
   - Load gsap, then this file. It finds .metatron-svg and animates it.
 
-  Attributes on the .metatron-svg wrapper
-  - data-autoplay="false"  -> do not start on load (Audio viewer)
+  Attribute data-autoplay="false" on the wrapper OR any ancestor
+  -> do not start on load (Audio viewer); call AHMetatron.play() later
 
   API (window.AHMetatron)
   - play()    start / resume the animation
@@ -21,7 +21,7 @@
   Behaviour
   - Respects prefers-reduced-motion (shows a still, resting frame)
   - Pauses automatically when off-screen or the tab is hidden
-  Version: 1.0.0
+  Version: 1.0.2 (values matched to the home page Blue Aurora)
 --------------------------------------------------------------*/
 (function () {
   'use strict';
@@ -29,8 +29,8 @@
   // ---- The one look: Blue Aurora -------------------------------
   var LOOK = {
     outerPortal:  { fill: '#4979f2', opacity: 0.7 },          // static
-    innerPortal:  { fill: '#4979f2', dim: 0.25, bright: 0.9, duration: 5, stagger: 0.3 },
-    centerPortal: { fill: '#995ac7', dim: 0.25, bright: 0.9, duration: 5 }, // reversed phase
+    innerPortal:  { fill: '#4979f2', opacity: 0.5, duration: 5, stagger: 0.3, delay: 0.5 },
+    centerPortal: { fill: '#995ac7', from: 0.73, to: 0.2, duration: 3 }, // reversed: starts bright
     outerFacets:  { fill: '#3399ff', duration: 2.5, stagger: 0.15, delay: 1 },
     innerFacets:  { fill: '#33b8ff', duration: 2.5, stagger: 0.15, delay: 1.5 }
   };
@@ -65,22 +65,22 @@
       fill: LOOK.outerPortal.fill, opacity: LOOK.outerPortal.opacity
     });
 
-    // Resting state for the animated parts
-    gsap.set(innerPortals, { fill: LOOK.innerPortal.fill, opacity: LOOK.innerPortal.dim });
-    gsap.set(centerPortal, { fill: LOOK.centerPortal.fill, opacity: LOOK.centerPortal.bright });
+    // Resting state (also the still frame for reduced-motion)
+    gsap.set(centerPortal, { fill: LOOK.centerPortal.fill, opacity: LOOK.centerPortal.from });
 
     if (!reduced) {
       tl.to(innerPortals, {
-        opacity: LOOK.innerPortal.bright,
+        fill: LOOK.innerPortal.fill,
+        opacity: LOOK.innerPortal.opacity,
         duration: LOOK.innerPortal.duration,
         ease: 'sine.inOut', repeat: -1, yoyo: true,
         stagger: LOOK.innerPortal.stagger
-      }, 0);
-      tl.to(centerPortal, {
-        opacity: LOOK.centerPortal.dim,
-        duration: LOOK.centerPortal.duration,
-        ease: 'sine.inOut', repeat: -1, yoyo: true
-      }, 0);
+      }, LOOK.innerPortal.delay);
+      tl.fromTo(centerPortal,
+        { fill: LOOK.centerPortal.fill, opacity: LOOK.centerPortal.from },
+        { fill: LOOK.centerPortal.fill, opacity: LOOK.centerPortal.to,
+          duration: LOOK.centerPortal.duration,
+          ease: 'sine.inOut', repeat: -1, yoyo: true }, 0);
       tl.to(outerFacets, {
         fill: LOOK.outerFacets.fill,
         duration: LOOK.outerFacets.duration,
@@ -102,7 +102,7 @@
     var self = this;
     this.root = root;
     this.tl = build(root);
-    this.wanted = root.getAttribute('data-autoplay') !== 'false'; // should be running
+    this.wanted = !root.closest('[data-autoplay="false"]'); // on the wrapper or any ancestor
     this.onScreen = true;
 
     if ('IntersectionObserver' in window) {
